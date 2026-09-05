@@ -1,0 +1,139 @@
+import { IconButton } from '@rific/feedback-press'
+import { MenuOption, PopoverHost, SectionedDropdown, usePopoverHost } from '@tastic/hud'
+import { StyleSheet, View } from 'react-native'
+
+import { FrictionLevel, PaddleSizeLevel, PuckSizeLevel } from '@/types'
+
+interface Props {
+  // Shared popover host — see PlayerSetupPanel's identical `host` prop. loadout.tsx always passes
+  // its own controlsHost here, in every game mode: this row sits in the same near/bottom zone as
+  // P1's own panel, so puck/paddle physics/score/difficulty need to be mutually exclusive with P1's
+  // color picker (only one of them can be open at a time), and — just as importantly — P1's
+  // press-away overlay only watches controlsHost.openId, so a dropdown opened on any *other* host
+  // would be invisible to it and never close on an outside tap. Omit only if some future caller
+  // genuinely wants this row fully independent (own host, own press-away wiring it'd have to
+  // provide itself).
+  host?: PopoverHost
+  friction: FrictionLevel
+  frictionOptions: MenuOption<FrictionLevel>[]
+  onFrictionChange: (value: FrictionLevel) => void
+  puckSize: PuckSizeLevel
+  puckSizeOptions: MenuOption<PuckSizeLevel>[]
+  onPuckSizeChange: (value: PuckSizeLevel) => void
+  paddleSize: PaddleSizeLevel
+  paddleSizeOptions: MenuOption<PaddleSizeLevel>[]
+  onPaddleSizeChange: (value: PaddleSizeLevel) => void
+  scoreToWin: number
+  scoreToWinOptions: MenuOption<number>[]
+  onScoreToWinChange: (value: number) => void
+  // Both one-shot actions on the settings above as a whole, not a value with a "current state" to
+  // show — rendered as plain IconButtons in their own row above the trigger row (not a
+  // SectionedDropdown trigger itself, which would misleadingly suggest a selected value to land
+  // on). Optional (and always passed as a pair) — loadout.tsx's own showMetaInSharedBand case
+  // renders these itself, inline in its merged back/dice/reset/settings header row, so this
+  // component leaves its own row out entirely rather than showing the same two actions twice.
+  onRandomize?: () => void
+  onReset?: () => void
+  accentColor: string
+  mutedColor: string
+  onAccentColor?: string
+  dark: boolean
+}
+
+// Always-upright row of shared (not per-player) settings in the loadout screen. Shares P1's popover
+// host (passed in by loadout.tsx in every game mode — see the `host` prop above) rather than owning
+// an independent one, so this row participates in P1's mutual-exclusivity and press-away wiring the
+// same way P1's own panel does. Pruned down from BoxHockey's version — no boardVariant/rink (no
+// board layout toggle exists here), no tipoffMode (no faceoff/coin-flip ceremony, the puck just
+// re-serves — see GOAL_SERVE_PAUSE_MS), no shotPreviewLength (no aimed-shot preview at all).
+// aiDifficulty moved out to a per-seat picker (see PlayerSetupPanel), matching BoxHockey's/
+// LightCycles' identical cross-app convention. Exported so loadout.tsx's own SharedActionBand
+// wrapper can run this same "is one of my own popovers open" membership check on itself.
+export const LOADOUT_SHARED_CONTROLS_IDS = ['puckPhysics', 'scoreToWin']
+
+export function LoadoutSharedControls({ host: sharedHost, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, paddleSize, paddleSizeOptions, onPaddleSizeChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
+  const ownHost = usePopoverHost()
+  const host = sharedHost ?? ownHost
+  // See PlayerSetupPanel's identical ownPopoverOpen comment — elevating this row for *any* open
+  // popover on a shared host (rather than only its own) would tie it with whichever sibling panel
+  // actually has the open popover, letting DOM order wrongly decide which one paints on top.
+  const ownPopoverOpen = host.openId !== null && LOADOUT_SHARED_CONTROLS_IDS.includes(host.openId)
+  // Same fg convention as every other component keying off a `dark` prop — full-contrast, unlike
+  // mutedColor/accentColor above, which are tuned for a TriggerGauge's own unselected/selected
+  // states rather than a plain icon button. Matches BoxHockey's/LightCycles' identical actionsRow.
+  const fg = dark ? '#FFFFFF' : '#000000'
+
+  return (
+    <View style={[styles.container, ownPopoverOpen && styles.containerOpen]}>
+      {onRandomize && onReset && (
+        <View style={styles.actionsRow}>
+          <IconButton icon='dice-multiple' iconColor={fg} size={18} onPress={onRandomize} accessibilityLabel='Randomize match settings' />
+          <IconButton icon='restore' iconColor={fg} size={18} onPress={onReset} accessibilityLabel='Reset match settings to defaults' />
+        </View>
+      )}
+
+      <View style={styles.row}>
+        {/* Friction, puck size, and paddle size all just govern how the puck/paddles themselves
+      behave, so they share one popover as three 'single' sections rather than three separate
+      triggers. autoDismiss is off: with three real lists to browse, picking a value in one
+      shouldn't snap the whole popover shut before the others have even been looked at —
+      press-away or the trigger itself closes it once all three are set. */}
+        <SectionedDropdown
+          id='puckPhysics'
+          host={host}
+          icon='speedometer-medium'
+          accessibilityLabel='Puck & paddle physics'
+          autoDismiss={false}
+          sections={[
+            { kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange },
+            { kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange },
+            { kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }
+          ]}
+          accentColor={accentColor}
+          mutedColor={mutedColor}
+          onAccentColor={onAccentColor}
+          dark={dark}
+        />
+
+        <SectionedDropdown id='scoreToWin' host={host} icon='flag-checkered' accessibilityLabel='Score to win' sections={[{ kind: 'single', id: 'scoreToWin', options: scoreToWinOptions, value: scoreToWin, onChange: onScoreToWinChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  // Above the trigger row — small, secondary-weight (size 18 vs. the triggers' own icon size) so
+  // Randomize/Reset read as quick actions on the settings below rather than a third setting of
+  // equal standing. On top (not below) to match loadout.tsx's own showMetaInSharedBand header row,
+  // which folds these same two actions in with back/settings above the triggers there too.
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  container: {
+    alignItems: 'center',
+    gap: 4
+  },
+  // See SectionedDropdown's anchorOpen comment — this whole column is itself a sibling of the
+  // player panels in loadout.tsx, and React Native Web's per-view stacking contexts mean a popover
+  // escaping the row below needs this wrapper elevated, not just the popover content, to paint
+  // above a later sibling panel.
+  containerOpen: {
+    zIndex: 100
+  },
+  row: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    // Safety net, not the primary fix — combining related pickers (see puckPhysics above) is what
+    // actually keeps this row from feeling cramped. But nothing capped its width before this, and a
+    // row of fixed-size triggers with no wrap just runs off the screen edge on a narrow device,
+    // taking the last trigger or two with it — untappable, not just clipped. Wrap is what turns
+    // that into "drops to a second centered line" instead.
+    flexWrap: 'wrap',
+    // Matches LightCycles' LobbySharedControls — wider than a plain icon row would need, to give
+    // each trigger's TriggerGauge arc (pulled in close around the icon itself — see TriggerGauge's
+    // own ARC_GAP) room to breathe against its neighbors instead of the arcs crowding each other.
+    gap: 20,
+    justifyContent: 'center'
+  }
+})

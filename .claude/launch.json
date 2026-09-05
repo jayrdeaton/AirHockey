@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "air-hockey-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--web", "--port", "8110"],
+      "port": 8110
+    },
+    {
+      "name": "air-hockey-metro",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["expo", "start", "--port", "8082"],
+      "port": 8082,
+      "url": "http://localhost:8082"
+    }
+  ]
+}
