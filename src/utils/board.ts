@@ -1,7 +1,7 @@
 import { Platform } from 'react-native'
 import { EdgeInsets } from 'react-native-safe-area-context'
 
-import { DESKTOP_WEB_MIN_WIDTH, FACEOFF_ZONE_RADIUS_RATIO, GOAL_LINE_STROKE_WIDTH, GOAL_WIDTH_RATIO, PADDLE_SIZE_RATIOS, PUCK_SIZE_RATIOS, TABLE_LONG_TO_SHORT_RATIO, WALL_THICKNESS } from '@/constants/game'
+import { DESKTOP_WEB_MIN_WIDTH, FACEOFF_ZONE_RADIUS_RATIO, GOAL_LINE_STROKE_WIDTH, GOAL_OPEN_FRACTION, PADDLE_SIZE_RATIOS, PUCK_SIZE_RATIOS, TABLE_LONG_TO_SHORT_RATIO, WALL_THICKNESS } from '@/constants/game'
 import { BoardLayout, GoalAxis, GoalPost, GoalSide, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
 
 // Mirrors game.tsx's own isDesktopWeb — desktop web is the only context that fixes the board to
@@ -81,7 +81,10 @@ export function computeBoardLayout(screenWidth: number, screenHeight: number, in
   const margin = boardMargin(screenWidth)
   const puckRadius = S * PUCK_SIZE_RATIOS[puckSize]
   const paddleRadius = S * PADDLE_SIZE_RATIOS[paddleSize]
-  const goalWidth = S * GOAL_WIDTH_RATIO[puckSize]
+  // See GOAL_OPEN_FRACTION's own comment: derived from the actual paddle+puck blocking span (not
+  // an independent flat fraction of S) so the goal stays fair for every size combination.
+  const blockingSpan = (paddleRadius + puckRadius) * 2
+  const goalWidth = blockingSpan / (1 - GOAL_OPEN_FRACTION)
   const goalStart = (S - goalWidth) / 2
   const goalEnd = goalStart + goalWidth
 

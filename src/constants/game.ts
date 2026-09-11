@@ -37,18 +37,20 @@ export const PADDLE_SIZE_RATIOS: Record<PaddleSizeLevel, number> = {
   large: 0.095
 }
 
-// Goal opening width, as a fraction of the board's SHORT edge — replaces BoxHockey's
-// puck-radius-derived DIVIDER_HOLE_TO_PUCK_RADIUS formula, which was deliberately narrow and
-// precision-demanding for a turn-based AIMED shot. AirHockey's puck arrives at the goal via
-// live, continuous paddle contact during a fast rally, not a careful aimed shot, so the goal
-// needs to be a genuinely wide, reachable target — real air-hockey goals run roughly 1/4 to 1/3
-// of the table's short edge. 'medium' (0.30) sits comfortably in that real-world range; still
-// keyed by puckSize (not a flat constant) so puck size keeps doubling as a difficulty tier.
-export const GOAL_WIDTH_RATIO: Record<PuckSizeLevel, number> = {
-  small: 0.26,
-  medium: 0.3,
-  large: 0.34
-}
+// How much of the goal must stay open around a single stationary, perfectly centered paddle —
+// replaces a prior flat-fraction-of-the-table-width GOAL_WIDTH_RATIO table (keyed only by
+// puckSize) that let a defender camp dead center and block literally every shot forever at
+// default settings: circle-vs-circle contact means a centered paddle blocks any shot whose
+// centerline passes within (paddleRadius + puckRadius) of it on either side — a "blocking span"
+// of 2x that sum — and the old table sized the goal as a flat fraction of the table's short edge
+// with no reference to that span at all, let alone to paddleSize, which is an entirely
+// independent user setting (see PaddleSizeLevel/LoadoutSharedControls) the old table couldn't see
+// even in principle. Goal width is now DERIVED from the actual blocking span (see
+// computeBoardLayout in utils/board.ts), so this fraction is the one number that actually decides
+// how campable the goal is, for every puckSize/paddleSize combination alike. 0.3 leaves roughly
+// the same ~30% gap around a centered paddle that a real air-hockey mallet/puck leaves around a
+// real table's goal.
+export const GOAL_OPEN_FRACTION = 0.3
 
 // Radius of each rink faceoff circle, as a fraction of the board's width — ported from BoxHockey
 // unchanged (its FACEOFF_ZONE_RADIUS_RATIO). AirHockey has no turn-based faceoff draw for these

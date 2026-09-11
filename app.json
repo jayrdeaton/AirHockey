@@ -31,12 +31,17 @@
       },
       "entitlements": {
         "com.apple.security.application-groups": [
+          "group.com.infinitetoken.tastic",
           "group.com.infinitetoken.tastic"
         ]
       }
     },
     "android": {
-      "package": "com.infinitetoken.airhockey"
+      "package": "com.infinitetoken.airhockey",
+      "permissions": [
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -71,8 +76,14 @@
       "@tastic/edge-guard"
     ],
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "8ad06de8-8fe8-4351-af92-440e79f0f328"
+      }
     },
-    "owner": "jayrdeaton"
+    "owner": "jayrdeaton",
+    "updates": {
+      "url": "https://u.expo.dev/8ad06de8-8fe8-4351-af92-440e79f0f328"
+    }
   }
 }

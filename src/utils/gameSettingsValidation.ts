@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   scoreToWin: SCORE_TO_WIN,
   aiDifficulty: 'medium',
   lockOrientation: false,
+  mapMode: 'rink',
   friction: 'medium',
   puckSize: 'medium',
   paddleSize: 'medium',
@@ -25,5 +26,5 @@ function isValidControlScheme(value: unknown): value is ControlScheme {
 export function isValidSettings(value: unknown): value is GameSettings {
   if (!value || typeof value !== 'object') return false
   const v = value as Partial<GameSettings>
-  return (v.gameMode === 'twoPlayer' || v.gameMode === 'vsCpu') && typeof v.scoreToWin === 'number' && (v.aiDifficulty === 'easy' || v.aiDifficulty === 'medium' || v.aiDifficulty === 'hard') && typeof v.lockOrientation === 'boolean' && (v.friction === 'low' || v.friction === 'medium' || v.friction === 'high') && (v.puckSize === 'small' || v.puckSize === 'medium' || v.puckSize === 'large') && (v.paddleSize === 'small' || v.paddleSize === 'medium' || v.paddleSize === 'large') && typeof v.deferBottomEdgeGestures === 'boolean' && !!v.controlScheme && isValidControlScheme(v.controlScheme[1]) && isValidControlScheme(v.controlScheme[2])
+  return (v.gameMode === 'twoPlayer' || v.gameMode === 'vsCpu') && typeof v.scoreToWin === 'number' && (v.aiDifficulty === 'easy' || v.aiDifficulty === 'medium' || v.aiDifficulty === 'hard') && typeof v.lockOrientation === 'boolean' && v.mapMode === 'rink' && (v.friction === 'low' || v.friction === 'medium' || v.friction === 'high') && (v.puckSize === 'small' || v.puckSize === 'medium' || v.puckSize === 'large') && (v.paddleSize === 'small' || v.paddleSize === 'medium' || v.paddleSize === 'large') && typeof v.deferBottomEdgeGestures === 'boolean' && !!v.controlScheme && isValidControlScheme(v.controlScheme[1]) && isValidControlScheme(v.controlScheme[2])
 }

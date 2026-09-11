@@ -42,6 +42,21 @@ describe('TICK ordering', () => {
     expect(next.puck.vy).toBeLessThan(0) // knocked upward, away from the approaching paddle
   })
 
+  it('a fast swipe past the puck in one tick still strikes it, instead of tunneling through', () => {
+    const reducer = makeReducer(5, 0.986)
+    const state = liveState()
+    // Player 1's paddle starts well to one side of the puck (which sits at center) and this
+    // tick's target jumps to well past the OTHER side — a fast swipe, or a dropped frame's larger
+    // dt — with neither position overlapping the puck. A plain start/end-of-tick check would see
+    // no contact at all; only a swept check along the path actually traveled catches it.
+    const combined = board.puckRadius + board.paddleRadius
+    const startX = board.centerX - combined * 3
+    const targetX = board.centerX + combined * 3
+    const targets = { 1: { x: targetX, y: board.centerY }, 2: state.paddles[2] }
+    const next = reducer({ ...state, paddles: { ...state.paddles, 1: { x: startX, y: board.centerY, vx: 0, vy: 0 } } }, { type: 'TICK', board, dt: 1, targets })
+    expect(next.puck.vx).toBeGreaterThan(0) // knocked forward, in the direction of the swipe
+  })
+
   it('TICK is a no-op outside the live phase', () => {
     const reducer = makeReducer(5, 0.986)
     const state = idleState()

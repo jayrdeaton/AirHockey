@@ -14,7 +14,7 @@ import { SettingsDialog } from '@/components/SettingsDialog'
 import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR, loadCpuColor, loadGuestColors, saveCpuColor, saveGuestColors } from '@/components/Theme'
 import { useGameSettings } from '@/hooks/useGameSettings'
 import { useProfiles } from '@/hooks/useProfiles'
-import { ControlScheme, FrictionLevel, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
+import { ControlScheme, FrictionLevel, MapMode, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
 import { AIDifficulty } from '@/utils/aiOpponent'
 import { humanPlayersFor, parseGameMode } from '@/utils/gameMode'
 import { DEFAULT_SETTINGS } from '@/utils/gameSettingsValidation'
@@ -25,6 +25,12 @@ import { safeBack } from '@/utils/navigation'
 // instead of adding to it, same 180ms BoxHockey itself uses for this exact fade.
 const PANEL_SWAP_FADE_MS = 180
 
+// Stubbed with a single option (see MapMode's own doc comment) — 'rink' just names the one table
+// layout that already exists (AirHockey's board is unconditionally rink-shaped), giving it a real
+// settings slot ahead of any second map actually existing. Matches BoxHockey's own
+// BOARD_VARIANT_OPTIONS shape (a MenuOption per layout), just with one entry today.
+const MAP_MODE_OPTIONS: MenuOption<MapMode>[] = [{ value: 'rink', label: 'Rink', description: 'Rounded corners + net pocket', icon: 'rounded-corner' }]
+
 const FRICTION_OPTIONS: MenuOption<FrictionLevel>[] = [
   { value: 'high', label: 'Slow', description: 'Puck stops quickly', icon: 'speedometer-slow' },
   { value: 'medium', label: 'Medium', description: 'Standard glide', icon: 'speedometer-medium' },
@@ -32,9 +38,9 @@ const FRICTION_OPTIONS: MenuOption<FrictionLevel>[] = [
 ]
 
 // Rewritten from BoxHockey's own puck-size descriptions, which referenced divider gaps that don't
-// exist here — AirHockey's puck size instead scales the goal mouth itself (see GOAL_WIDTH_RATIO in
-// constants/game.ts), so it's a forgiveness/difficulty knob on scoring rather than a squeeze-through
-// one.
+// exist here — AirHockey's puck size instead scales the goal mouth itself (goal width is derived
+// from puck+paddle radii — see GOAL_OPEN_FRACTION in constants/game.ts), so it's a
+// forgiveness/difficulty knob on scoring rather than a squeeze-through one.
 const PUCK_SIZE_OPTIONS: MenuOption<PuckSizeLevel>[] = [
   { value: 'small', label: 'Small', description: 'Narrower goals, harder to score', icon: 'circle-small' },
   { value: 'medium', label: 'Medium', description: 'Standard size', icon: 'circle-medium' },
@@ -228,6 +234,7 @@ export default function LoadoutScreen() {
   // identically-shaped handlers.
   const handleRandomizeMatchSettings = useCallback(() => {
     setSettings({
+      mapMode: pickRandom(MAP_MODE_OPTIONS),
       friction: pickRandom(FRICTION_OPTIONS),
       puckSize: pickRandom(PUCK_SIZE_OPTIONS),
       paddleSize: pickRandom(PADDLE_SIZE_OPTIONS),
@@ -238,6 +245,7 @@ export default function LoadoutScreen() {
 
   const handleResetMatchSettings = useCallback(() => {
     setSettings({
+      mapMode: DEFAULT_SETTINGS.mapMode,
       friction: DEFAULT_SETTINGS.friction,
       puckSize: DEFAULT_SETTINGS.puckSize,
       paddleSize: DEFAULT_SETTINGS.paddleSize,
@@ -311,6 +319,9 @@ export default function LoadoutScreen() {
   const sharedControlsRow = (
     <LoadoutSharedControls
       host={controlsHost}
+      mapMode={settings.mapMode}
+      mapModeOptions={MAP_MODE_OPTIONS}
+      onMapModeChange={(value) => setSettings({ mapMode: value })}
       friction={settings.friction}
       frictionOptions={FRICTION_OPTIONS}
       onFrictionChange={(value) => setSettings({ friction: value })}

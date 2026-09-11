@@ -78,8 +78,8 @@ export function makeReducer(scoreToWin: number, friction: number) {
         }
 
         let puck: PuckState = state.puck
-        puck = applyPaddleCollision(puck, paddles[1], action.board.puckRadius, action.board.paddleRadius)
-        puck = applyPaddleCollision(puck, paddles[2], action.board.puckRadius, action.board.paddleRadius)
+        puck = applyPaddleCollision(puck, state.paddles[1], paddles[1], action.board.puckRadius, action.board.paddleRadius)
+        puck = applyPaddleCollision(puck, state.paddles[2], paddles[2], action.board.puckRadius, action.board.paddleRadius)
         const result = stepPhysics(puck, action.board, action.dt, friction)
 
         if (result.scored !== null) {
@@ -100,6 +100,10 @@ export function makeReducer(scoreToWin: number, friction: number) {
 
         // Unlike BoxHockey, a stopped puck does not end anything here — there is no turn to pass.
         // It simply sits there, mid-rally, until a paddle touches it again, same as a real table.
+        // A puck stuck behind a goal line specifically (reachable via a rounded-corner wraparound
+        // that bypasses scoring — see boardCornerQuadrant in physics.ts) can never come to rest at
+        // all: stepPhysicsOnce exempts it from friction back there for exactly that reason, so
+        // there's no separate recovery to do here.
         return {
           ...state,
           puck: result,

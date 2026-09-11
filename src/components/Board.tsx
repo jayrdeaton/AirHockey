@@ -11,12 +11,6 @@ import { BoardLayout, GamePhase, GoalSide, PaddleStates, Player, PuckState } fro
 import { faceoffZoneCenters, faceoffZoneRadius } from '@/utils/board'
 import { computeGoalWedges } from '@/utils/goalWedges'
 
-// Flip to true locally to see the rink pocket's true collision curve (rounded corners +
-// behind-goal pocket) while tuning cornerRadius/behindGoalDepth in computeBoardLayout — off by
-// default, matching BoxHockey's own verdict that the pocket reads better with nothing drawn there
-// (the device's own physical screen edge is the only boundary a player ever needs to see).
-const SHOW_RINK_DEBUG_PERIMETER = false
-
 export interface BoardProps {
   board: BoardLayout
   puck: PuckState
@@ -104,9 +98,13 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
 
   // ─── Rink pocket perimeter (curved caps behind each goal) ──────────────────
   // Ported from BoxHockey's opt-in 'rink' case, now the only geometry there is (see
-  // computeBoardLayout — cornerRadius/behindGoalDepth are unconditional). Kept computed but only
-  // drawn behind SHOW_RINK_DEBUG_PERIMETER, same verdict BoxHockey's own playtesting reached: the
-  // device's physical screen edge already reads as the boundary, so nothing needs to be drawn.
+  // computeBoardLayout — cornerRadius/behindGoalDepth are unconditional). Unlike BoxHockey (where
+  // this same curve is a debug-only aid, hidden by default since its rink is an opt-in toggle most
+  // rounds never use — the "safe area" behind the goal simply isn't reachable to begin with when
+  // rink is off there), AirHockey's pocket is a permanent, unconditional part of every board, so a
+  // player can always drift or get knocked back there — the curve marking where it actually
+  // bounces is real, load-bearing information every round, not a tuning aid, so it's drawn always
+  // (see the render usage below) rather than gated behind a debug flag.
   const rinkPerimeterPath = useMemo(() => {
     const cr = board.cornerRadius
     const outerTop = y - board.behindGoalDepth
@@ -198,18 +196,16 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
             both layers on — this is the ONLY visual cue that the gap isn't actually open. */}
         <GoalDoorFlash leftX={goalAbsLeft} rightX={goalAbsRight} topY={y} bottomY={y + height} topColor={p2Color} bottomColor={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} hitCount={goalDoorHitCount} hitSide={lastGoalDoorSide} />
 
-        {/* Perimeter walls — same `showWalls && !rinkPerimeterPath` gate as BoxHockey, ported
-            verbatim rather than simplified away: a solid wall Rect flanking the goal would draw a
-            non-crossable boundary directly abutting a goal line/post that's marking a crossable
-            one (see the goal lines' own comment just above) — the exact contradiction a plain
-            `showWalls &&` (no rink check) was drawing here before. Since AirHockey's pocket is
-            unconditional, rinkPerimeterPath is never null, so this condition is now permanently
-            false and the Rects never render — same effective outcome BoxHockey's own rink-on
-            case reaches, structurally identical rather than special-cased away. The device's own
-            physical screen edge (native/mobile web) or open space (desktop web) is the only
-            boundary drawn on the table's long sides; SHOW_RINK_DEBUG_PERIMETER below is the only
-            way to see the curved pocket boundary this same gate gave up drawing. */}
-        {SHOW_RINK_DEBUG_PERIMETER && <Path path={rinkPerimeterPath} style='stroke' strokeWidth={wallThickness} strokeCap='round' color={wallColor} />}
+        {/* Rink pocket boundary — the curved caps built above, now always drawn (see that
+            comment). Also the only perimeter boundary ever drawn on the table's long sides at all:
+            the `showWalls && !rinkPerimeterPath` Rect fallback just below never fires, the same
+            `showWalls &&` (no rink check) contradiction BoxHockey itself guards against — a solid
+            Rect flanking the goal would draw a non-crossable boundary directly abutting a goal
+            line/post that's marking a crossable one (see the goal lines' own comment just above).
+            Since AirHockey's pocket is unconditional, rinkPerimeterPath is never null, so that
+            fallback is permanently dead — same effective outcome BoxHockey's own rink-on case
+            reaches, structurally identical rather than special-cased away. */}
+        <Path path={rinkPerimeterPath} style='stroke' strokeWidth={wallThickness} strokeCap='round' color={wallColor} />
         {showWalls && !rinkPerimeterPath && (
           <>
             <ObstacleRect x={x - wallThickness} y={y - wallThickness} width={wallThickness} height={height + wallThickness * 2} color={wallColor} />

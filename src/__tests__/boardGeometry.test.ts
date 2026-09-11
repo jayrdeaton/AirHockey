@@ -1,5 +1,5 @@
-import { GOAL_WIDTH_RATIO } from '@/constants/game'
-import { GoalAxis, PuckSizeLevel } from '@/types'
+import { GOAL_OPEN_FRACTION } from '@/constants/game'
+import { GoalAxis, PaddleSizeLevel, PuckSizeLevel } from '@/types'
 import { centerPaddle, clampToOwnHalf, computeBoardLayout, playerGoalSide } from '@/utils/board'
 import { stepPhysics } from '@/utils/physics'
 
@@ -18,14 +18,25 @@ function simulateToRest(puck: { x: number; y: number; vx: number; vy: number }, 
 
 const sizes: PuckSizeLevel[] = ['small', 'medium', 'large']
 
-describe('goal width stays within the real-world 1/4-1/3-of-short-edge band', () => {
-  it.each(sizes)('at puckSize=%s', (size) => {
-    const board = computeBoardLayout(400, 900, insets, 'vertical', size)
-    const ratio = board.goalWidth / board.width
-    expect(ratio).toBeCloseTo(GOAL_WIDTH_RATIO[size], 5)
-    expect(ratio).toBeGreaterThanOrEqual(0.25)
-    expect(ratio).toBeLessThanOrEqual(0.35)
-  })
+describe('goal width always leaves GOAL_OPEN_FRACTION of open net around a centered paddle', () => {
+  const paddleSizes: PaddleSizeLevel[] = ['small', 'medium', 'large']
+  // Every puckSize x paddleSize combination — paddleSize is an entirely independent setting (see
+  // LoadoutSharedControls), so this also guards the cross-combination cases (e.g. a small puck
+  // with a large paddle) that the old puckSize-only GOAL_WIDTH_RATIO table couldn't see at all.
+  for (const puckSize of sizes) {
+    for (const paddleSize of paddleSizes) {
+      it(`puckSize=${puckSize}, paddleSize=${paddleSize}`, () => {
+        const board = computeBoardLayout(400, 900, insets, 'vertical', puckSize, paddleSize)
+        // The span a single stationary, perfectly centered paddle blocks via circle-vs-circle
+        // contact — see GOAL_OPEN_FRACTION's own comment in constants/game.ts.
+        const blockingSpan = (board.paddleRadius + board.puckRadius) * 2
+        expect(board.goalWidth).toBeGreaterThan(blockingSpan)
+        expect(board.goalWidth).toBeLessThan(board.width)
+        const openFraction = (board.goalWidth - blockingSpan) / board.goalWidth
+        expect(openFraction).toBeCloseTo(GOAL_OPEN_FRACTION, 5)
+      })
+    }
+  }
 })
 
 describe('rotating the device (swapping which real dimension is short/long) produces geometrically equivalent local geometry', () => {

@@ -28,6 +28,30 @@ import { humanPlayersFor } from '@/utils/gameMode'
 import { DEFAULT_SETTINGS } from '@/utils/gameSettingsValidation'
 import { safeBack } from '@/utils/navigation'
 
+// Converts a point expressed in the board's own LOCAL coordinate space (the same frame board.x/y
+// lives in) into a real, absolute screen position — mirrors Pong's own localToScreen exactly (see
+// its doc comment there), needed here for the same reason: floating UI (the back/settings chips
+// below) lives OUTSIDE the rotated local container, so anchoring it to "the board's own top-left
+// corner" only lands in the right real screen spot if this applies the SAME rotationDeg the
+// container itself was rotated by.
+function localToScreen(localX: number, localY: number, containerWidth: number, containerHeight: number, screenCenterX: number, screenCenterY: number, rotation: 0 | 90 | -90): { x: number; y: number } {
+  const lx = localX - containerWidth / 2
+  const ly = localY - containerHeight / 2
+  let dx: number
+  let dy: number
+  if (rotation === 90) {
+    dx = -ly
+    dy = lx
+  } else if (rotation === -90) {
+    dx = ly
+    dy = -lx
+  } else {
+    dx = lx
+    dy = ly
+  }
+  return { x: screenCenterX + dx, y: screenCenterY + dy }
+}
+
 export default function GameScreen() {
   // Committed once by /loadout when every human player readied up — falls back to defaults for a
   // direct/deep link to this screen, which never went through /loadout to commit anything.
@@ -185,6 +209,25 @@ export default function GameScreen() {
     prevPhaseRef.current = phase
   }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, goalDoorHitCount, lastSelected, roundSettings.gameMode, recordMatchOutcome, showAchievementToast])
 
+  // ─── Floating UI placement ─────────────────────────────────────────────────
+  // Back/settings chips and the Game Over/quit-confirm cards all live OUTSIDE the board's own
+  // rotated container (see the JSX below), so each is individually positioned/rotated via
+  // rotationDeg rather than inheriting the container's own transform — same technique Pong's game
+  // screen uses for its own floating chips.
+  //
+  // localToScreen's containerWidth/Height MUST be localSize.width/height (the pre-rotation
+  // container's own S×L size — always portrait-shaped, per computeLocalContainerSize's own doc),
+  // NOT logicalWidth/logicalHeight: board.x/y live in that same S×L local frame (computeBoardLayout
+  // returns board.width as S, board.height as L — see utils/board.ts), and it's THAT view, sized to
+  // localSize and centered in the real viewport, that rotationDeg actually rotates — confirmed by
+  // reproducing the original bug in the browser preview (using logicalWidth/Height here sent the
+  // back chip well off-screen once desktop web's letterboxing made S×L diverge from
+  // logicalWidth×logicalHeight).
+  const buttonMargin = 16
+  const backPos = localToScreen(board.x + buttonMargin, board.y + buttonMargin, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
+  const settingsPos = localToScreen(board.x + board.width - buttonMargin, board.y + buttonMargin, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
+  const rotationStyle = rotationDeg !== 0 ? { transform: [{ rotate: `${rotationDeg}deg` }] } : undefined
+
   return (
     <View style={[styles.root, { backgroundColor: bg }]}>
       <StatusBar hidden />
@@ -222,10 +265,12 @@ export default function GameScreen() {
       render is exactly right, not stale. */}
       <KeyboardInputLayer enabled={!paused} humanPlayers={humanPlayers} controlScheme={roundSettings.controlScheme} paddlePos={{ 1: paddles[1], 2: paddles[2] }} onPaddleTarget={setPaddleTarget} />
 
-      {/* Game Over overlay */}
+      {/* Game Over overlay — card rotates as a unit via rotationDeg so it reads upright whichever
+          way the board itself is currently rotated (see rotationStyle above), matching Pong's own
+          overlayCard treatment; previously left unrotated. */}
       {phase === 'gameOver' && (
         <View style={styles.overlay}>
-          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }, rotationStyle]}>
             <Icon source='trophy' size={64} color={playerColor[winner]} />
             <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[winner], fontFamily: MONO_FONT }]}>
               Wins!
@@ -245,10 +290,10 @@ export default function GameScreen() {
         </View>
       )}
 
-      {/* Quit confirmation */}
+      {/* Quit confirmation — same rotationStyle treatment as the Game Over card above. */}
       {confirmBackVisible && (
         <View style={styles.overlay}>
-          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }]}>
+          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }, rotationStyle]}>
             <Icon source='alert-circle-outline' size={64} color={themeColors.secondary} />
             <Text variant='headlineLarge' style={[styles.overlayTitle, { color: themeColors.secondary, fontFamily: MONO_FONT }]}>
               Quit Match?
@@ -268,16 +313,23 @@ export default function GameScreen() {
         </View>
       )}
 
-      {/* Back + settings — fixed top corners, same convention as index.tsx/loadout.tsx. Unlike
-          BoxHockey's centerline-on-the-dividing-wall placement (needed there because its board is
-          split face-to-face with P2's half rotated 180°), AirHockey's board is never rotated per
-          player — only the whole board rotates as a unit for GoalAxis — so a top corner never
-          sits inside either player's own zone. */}
-      <View style={[styles.backButton, { top: insets.top, left: insets.left }]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={onBackPress} />
+      {/* Back + settings — anchored to the board's own top corners in LOCAL space (board.x/y), then
+          mapped to a real screen position via localToScreen using the SAME rotationDeg the board's
+          own container above is rotated by, so the pair travels (not just spins) to track wherever
+          the board's rotated top edge actually lands on screen — same technique Pong's own
+          back/settings chips use. Previously pinned to the real screen's raw top-left/top-right
+          (insets.top/left/right, never rotated or moved): correct only at rotationDeg 0; once
+          goalAxis flipped to 'horizontal' the board spun ±90° underneath while these stayed put,
+          landing in the wrong corner relative to the now-rotated board and never turning to stay
+          legible. Unlike BoxHockey's centerline placement (needed there because its board splits
+          face-to-face with P2's half rotated 180°), AirHockey's board is never rotated PER PLAYER —
+          only as a single unit for goalAxis — so one shared, non-neutral corner pair is still
+          correct; it just has to move and rotate with that unit rotation instead of ignoring it. */}
+      <View style={[styles.backButton, { left: backPos.x - 24, top: backPos.y - 24 }]}>
+        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={onBackPress} />
       </View>
-      <View style={[styles.settingsButton, { top: insets.top, right: insets.right }]}>
-        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={styles.chipButton} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
+      <View style={[styles.settingsButton, { left: settingsPos.x - 24, top: settingsPos.y - 24 }]}>
+        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
       </View>
 
       {/* rotation={rotationDeg} — same physical-hold-compensating rotation the board itself uses

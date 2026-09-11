@@ -148,6 +148,26 @@ describe('stepPhysics — rink pocket door', () => {
     expect(result.bounced).toBe(false)
     expect(result.goalDoorHit).toBeNull()
   })
+
+  it('does not decay a puck already behind the line, off to the side of the goal mouth — friction is what would otherwise strand it there with no paddle able to follow', () => {
+    // Same off-to-the-side spot as the wraparound test above — outside the goal x-range, so
+    // neither the score check nor the one-way door ever see it — but this time already resting
+    // behind the front line rather than just crossing it, and moving purely sideways (parallel to
+    // the line) so nothing else this step (wall/corner/post) touches its velocity either. A strong
+    // friction coefficient makes any decay obvious if the exemption weren't working.
+    const outsideGoalX = rinkBoard.x + rinkBoard.cornerRadius + 30
+    const puck = { x: outsideGoalX, y: board.y - r - 5, vx: 3, vy: 0 }
+    const result = stepPhysics(puck, rinkBoard, 1, 0.5)
+    expect(result.bounced).toBe(false)
+    expect(result.vx).toBeCloseTo(3, 5)
+  })
+
+  it('does decay the same puck normally once it is back in front of the line', () => {
+    const outsideGoalX = rinkBoard.x + rinkBoard.cornerRadius + 30
+    const puck = { x: outsideGoalX, y: board.y + r + 5, vx: 3, vy: 0 }
+    const result = stepPhysics(puck, rinkBoard, 1, 0.5)
+    expect(result.vx).toBeLessThan(3)
+  })
 })
 
 describe('applyPaddleCollision', () => {
@@ -157,7 +177,7 @@ describe('applyPaddleCollision', () => {
   it('is a no-op when the puck and paddle are not overlapping', () => {
     const puck = { x: 0, y: 0, vx: 3, vy: 3 }
     const paddle = { x: 500, y: 500, vx: 0, vy: 0 }
-    const result = applyPaddleCollision(puck, paddle, puckRadius, paddleRadius)
+    const result = applyPaddleCollision(puck, paddle, paddle, puckRadius, paddleRadius)
     expect(result).toEqual(puck)
   })
 
@@ -166,7 +186,7 @@ describe('applyPaddleCollision', () => {
     const combined = puckRadius + paddleRadius
     const puck = { x: -combined + 2, y: 0, vx: 5, vy: 0 }
     const paddle = { x: 0, y: 0, vx: 0, vy: 0 }
-    const result = applyPaddleCollision(puck, paddle, puckRadius, paddleRadius)
+    const result = applyPaddleCollision(puck, paddle, paddle, puckRadius, paddleRadius)
     // Normal points from paddle to puck, i.e. roughly (-1, 0) — puck's vx should reverse sign and
     // scale by restitution, tangential vy stays 0.
     expect(result.vx).toBeLessThan(0)
@@ -179,8 +199,8 @@ describe('applyPaddleCollision', () => {
     const puck = { x: combined - 2, y: 0, vx: 0, vy: 0 }
     const slowPaddle = { x: 0, y: 0, vx: 8, vy: 0 }
     const fastPaddle = { x: 0, y: 0, vx: 20, vy: 0 }
-    const slowResult = applyPaddleCollision(puck, slowPaddle, puckRadius, paddleRadius)
-    const fastResult = applyPaddleCollision(puck, fastPaddle, puckRadius, paddleRadius)
+    const slowResult = applyPaddleCollision(puck, slowPaddle, slowPaddle, puckRadius, paddleRadius)
+    const fastResult = applyPaddleCollision(puck, fastPaddle, fastPaddle, puckRadius, paddleRadius)
     expect(slowResult.vx).toBeGreaterThan(0) // launched, not left at rest
     expect(fastResult.vx).toBeGreaterThan(slowResult.vx) // a faster mallet hits harder
   })
@@ -190,7 +210,7 @@ describe('applyPaddleCollision', () => {
     const puck = { x: combined - 2, y: 0, vx: -3, vy: 1 }
     const paddle = { x: 0, y: 0, vx: 12, vy: -4 }
     const paddleSnapshot = { ...paddle }
-    applyPaddleCollision(puck, paddle, puckRadius, paddleRadius)
+    applyPaddleCollision(puck, paddle, paddle, puckRadius, paddleRadius)
     expect(paddle).toEqual(paddleSnapshot)
   })
 
@@ -199,9 +219,31 @@ describe('applyPaddleCollision', () => {
     const combined = puckRadius + paddleRadius
     const puck = { x: combined - 2, y: 0, vx: 5, vy: 0 } // moving further in +x, away from paddle at origin
     const paddle = { x: 0, y: 0, vx: 0, vy: 0 }
-    const result = applyPaddleCollision(puck, paddle, puckRadius, paddleRadius)
+    const result = applyPaddleCollision(puck, paddle, paddle, puckRadius, paddleRadius)
     expect(result.vx).toBeCloseTo(5, 5)
     expect(result.vy).toBeCloseTo(0, 5)
+  })
+
+  it('a fast swipe clean past the puck (neither endpoint overlapping) still registers a strike', () => {
+    // Paddle starts well clear on one side of the puck and ends well clear on the OTHER side,
+    // all within a single tick — a fast swipe, or a dropped frame's larger dt. Neither the start
+    // nor the end position overlaps the puck, so only a swept check along the path actually
+    // traveled catches this; a plain endpoint-only check would have missed it entirely (the
+    // tunneling bug this test guards against).
+    const combined = puckRadius + paddleRadius
+    const puck = { x: 0, y: 0, vx: 0, vy: 0 }
+    const prevPaddle = { x: -combined * 3, y: 0, vx: 0, vy: 0 }
+    const paddle = { x: combined * 3, y: 0, vx: 40, vy: 0 }
+    const result = applyPaddleCollision(puck, prevPaddle, paddle, puckRadius, paddleRadius)
+    expect(result.vx).toBeGreaterThan(0) // knocked forward, in the direction of the swipe
+  })
+
+  it('a paddle path that never comes near the puck is still a no-op', () => {
+    const puck = { x: 0, y: 0, vx: 0, vy: 0 }
+    const prevPaddle = { x: 500, y: 500, vx: 0, vy: 0 }
+    const paddle = { x: 600, y: 600, vx: 40, vy: 40 }
+    const result = applyPaddleCollision(puck, prevPaddle, paddle, puckRadius, paddleRadius)
+    expect(result).toEqual(puck)
   })
 })
 

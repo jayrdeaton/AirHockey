@@ -2,18 +2,21 @@ import { IconButton } from '@rific/feedback-press'
 import { MenuOption, PopoverHost, SectionedDropdown, usePopoverHost } from '@tastic/hud'
 import { StyleSheet, View } from 'react-native'
 
-import { FrictionLevel, PaddleSizeLevel, PuckSizeLevel } from '@/types'
+import { FrictionLevel, MapMode, PaddleSizeLevel, PuckSizeLevel } from '@/types'
 
 interface Props {
   // Shared popover host — see PlayerSetupPanel's identical `host` prop. loadout.tsx always passes
   // its own controlsHost here, in every game mode: this row sits in the same near/bottom zone as
-  // P1's own panel, so puck/paddle physics/score/difficulty need to be mutually exclusive with P1's
-  // color picker (only one of them can be open at a time), and — just as importantly — P1's
+  // P1's own panel, so map/puck/paddle physics/score/difficulty need to be mutually exclusive with
+  // P1's color picker (only one of them can be open at a time), and — just as importantly — P1's
   // press-away overlay only watches controlsHost.openId, so a dropdown opened on any *other* host
   // would be invisible to it and never close on an outside tap. Omit only if some future caller
   // genuinely wants this row fully independent (own host, own press-away wiring it'd have to
   // provide itself).
   host?: PopoverHost
+  mapMode: MapMode
+  mapModeOptions: MenuOption<MapMode>[]
+  onMapModeChange: (value: MapMode) => void
   friction: FrictionLevel
   frictionOptions: MenuOption<FrictionLevel>[]
   onFrictionChange: (value: FrictionLevel) => void
@@ -43,15 +46,20 @@ interface Props {
 // Always-upright row of shared (not per-player) settings in the loadout screen. Shares P1's popover
 // host (passed in by loadout.tsx in every game mode — see the `host` prop above) rather than owning
 // an independent one, so this row participates in P1's mutual-exclusivity and press-away wiring the
-// same way P1's own panel does. Pruned down from BoxHockey's version — no boardVariant/rink (no
-// board layout toggle exists here), no tipoffMode (no faceoff/coin-flip ceremony, the puck just
-// re-serves — see GOAL_SERVE_PAUSE_MS), no shotPreviewLength (no aimed-shot preview at all).
+// same way P1's own panel does. Pruned down from BoxHockey's version — no tipoffMode (no
+// faceoff/coin-flip ceremony, the puck just re-serves — see GOAL_SERVE_PAUSE_MS), no
+// shotPreviewLength (no aimed-shot preview at all), and — unlike BoxHockey's boardVariant/rink,
+// which combine into one dropdown — mapMode gets its own standalone trigger, since it's currently
+// a single-option stub with no companion toggle to ride alongside it. Friction/puckSize/paddleSize
+// each get their own trigger too, rather than sharing one bundled "puck physics" popover the way
+// BoxHockey still does: with three real lists (plus mapMode/scoreToWin) all live at once in this
+// app's loadout, a single combined popover buried unrelated settings behind one speedometer icon.
 // aiDifficulty moved out to a per-seat picker (see PlayerSetupPanel), matching BoxHockey's/
 // LightCycles' identical cross-app convention. Exported so loadout.tsx's own SharedActionBand
 // wrapper can run this same "is one of my own popovers open" membership check on itself.
-export const LOADOUT_SHARED_CONTROLS_IDS = ['puckPhysics', 'scoreToWin']
+export const LOADOUT_SHARED_CONTROLS_IDS = ['mapMode', 'friction', 'puckSize', 'paddleSize', 'scoreToWin']
 
-export function LoadoutSharedControls({ host: sharedHost, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, paddleSize, paddleSizeOptions, onPaddleSizeChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
+export function LoadoutSharedControls({ host: sharedHost, mapMode, mapModeOptions, onMapModeChange, friction, frictionOptions, onFrictionChange, puckSize, puckSizeOptions, onPuckSizeChange, paddleSize, paddleSizeOptions, onPaddleSizeChange, scoreToWin, scoreToWinOptions, onScoreToWinChange, onRandomize, onReset, accentColor, mutedColor, onAccentColor, dark }: Props) {
   const ownHost = usePopoverHost()
   const host = sharedHost ?? ownHost
   // See PlayerSetupPanel's identical ownPopoverOpen comment — elevating this row for *any* open
@@ -73,27 +81,22 @@ export function LoadoutSharedControls({ host: sharedHost, friction, frictionOpti
       )}
 
       <View style={styles.row}>
-        {/* Friction, puck size, and paddle size all just govern how the puck/paddles themselves
-      behave, so they share one popover as three 'single' sections rather than three separate
-      triggers. autoDismiss is off: with three real lists to browse, picking a value in one
-      shouldn't snap the whole popover shut before the others have even been looked at —
-      press-away or the trigger itself closes it once all three are set. */}
-        <SectionedDropdown
-          id='puckPhysics'
-          host={host}
-          icon='speedometer-medium'
-          accessibilityLabel='Puck & paddle physics'
-          autoDismiss={false}
-          sections={[
-            { kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange },
-            { kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange },
-            { kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }
-          ]}
-          accentColor={accentColor}
-          mutedColor={mutedColor}
-          onAccentColor={onAccentColor}
-          dark={dark}
-        />
+        {/* Map — stubbed to a single 'rink' option today (see MapMode's own doc comment), but
+      already its own standalone trigger rather than folded into puckPhysics below, matching
+      BoxHockey's own boardVariant trigger placement (first in the row) so a second/third map
+      option later is a pure options-array change, not a UI reshuffle. */}
+        <SectionedDropdown id='mapMode' host={host} icon='view-grid-outline' accessibilityLabel='Map' sections={[{ kind: 'single', id: 'mapMode', options: mapModeOptions, value: mapMode, onChange: onMapModeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+
+        {/* Friction, puck size, and paddle size each get their own standalone trigger — previously
+      bundled into one 'puckPhysics' popover (three sections behind a single speedometer icon), but
+      that buried puck size/paddle size behind a menu literally labeled for speed, and made every
+      one of the three an extra tap deep. Each is a real, independent match setting on par with
+      scoreToWin below, so each gets the same standalone-trigger treatment scoreToWin already had. */}
+        <SectionedDropdown id='friction' host={host} icon='speedometer-medium' accessibilityLabel='Puck speed' sections={[{ kind: 'single', id: 'friction', options: frictionOptions, value: friction, onChange: onFrictionChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+
+        <SectionedDropdown id='puckSize' host={host} icon='hockey-puck' accessibilityLabel='Puck size' sections={[{ kind: 'single', id: 'puckSize', options: puckSizeOptions, value: puckSize, onChange: onPuckSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
+
+        <SectionedDropdown id='paddleSize' host={host} icon='circle-double' accessibilityLabel='Paddle size' sections={[{ kind: 'single', id: 'paddleSize', options: paddleSizeOptions, value: paddleSize, onChange: onPaddleSizeChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
 
         <SectionedDropdown id='scoreToWin' host={host} icon='flag-checkered' accessibilityLabel='Score to win' sections={[{ kind: 'single', id: 'scoreToWin', options: scoreToWinOptions, value: scoreToWin, onChange: onScoreToWinChange }]} accentColor={accentColor} mutedColor={mutedColor} onAccentColor={onAccentColor} dark={dark} />
       </View>

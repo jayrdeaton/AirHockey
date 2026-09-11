@@ -25,8 +25,9 @@ export type AiDifficulty = 'easy' | 'medium' | 'hard'
 export type FrictionLevel = 'low' | 'medium' | 'high'
 
 // Per-round puck radius tier, as a fraction of the board's short (goal) edge — see
-// PUCK_SIZE_RATIOS and GOAL_WIDTH_RATIO in constants/game.ts. Puck size doubles as a difficulty
-// tier: a bigger puck also gets a wider goal to match.
+// PUCK_SIZE_RATIOS in constants/game.ts. Puck size doubles as a difficulty tier: a bigger puck
+// also widens the goal to match (goal width is DERIVED from puck+paddle radii — see
+// GOAL_OPEN_FRACTION — not an independent ratio).
 export type PuckSizeLevel = 'small' | 'medium' | 'large'
 
 // Per-round paddle (mallet) radius tier, same short-edge-fraction convention as PuckSizeLevel —
@@ -34,6 +35,15 @@ export type PuckSizeLevel = 'small' | 'medium' | 'large'
 // physically collides with the puck (see applyPaddleCollision in utils/physics.ts), so its size
 // is a real gameplay knob, not just cosmetic.
 export type PaddleSizeLevel = 'small' | 'medium' | 'large'
+
+// Per-round table layout — stubbed with a single value for now, the way BoxHockey's own
+// BoardVariant presumably started before gauntlet/gravity existed. AirHockey's board is currently
+// always rink-shaped (see BoardLayout's own cornerRadius/behindGoalDepth, both unconditional in
+// computeBoardLayout), so 'rink' just names the one layout that already exists — this gives it a
+// real settings slot/UI entry (see LoadoutSharedControls' own 'mapMode' trigger, matching
+// BoxHockey's 'boardVariant' pattern one-for-one) ready for more values later, without switching
+// any behavior today.
+export type MapMode = 'rink'
 
 export interface GameSettings {
   gameMode: GameMode
@@ -44,6 +54,7 @@ export interface GameSettings {
   // just follows however the device is actually being
   // held, rather than being a stored preference itself.
   lockOrientation: boolean
+  mapMode: MapMode
   friction: FrictionLevel
   puckSize: PuckSizeLevel
   paddleSize: PaddleSizeLevel

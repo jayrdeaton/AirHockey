@@ -2,6 +2,7 @@ import { Toaster, ToastProvider } from '@rific/toaster'
 import { AccelerometerOrientationProvider, getViewRotation, useAccelerometerOrientation } from '@tastic/split-screen'
 import * as Haptics from 'expo-haptics'
 import { Stack } from 'expo-router'
+import { DeviceMotion } from 'expo-sensors'
 import { StatusBar } from 'expo-status-bar'
 import { ReactNode } from 'react'
 import { StyleSheet } from 'react-native'
@@ -85,7 +86,9 @@ export default function RootLayout() {
                       committed orientation survive screen navigation, instead of each screen's own hook
                       instance restarting from a default guess on every mount. */}
                       <GameStatsProvider>
-                        <AccelerometerOrientationProvider>
+                        {/* deviceMotion is the app's own real expo-sensors import, injected rather than
+                        imported by @tastic/core itself — see that package's own doc for why. */}
+                        <AccelerometerOrientationProvider deviceMotion={DeviceMotion}>
                           <ToastProvider haptics={Haptics} paper={RNPaper}>
                             <Stack screenOptions={{ headerShown: false, gestureEnabled: false }} />
                             <RotationAwareStatusBar />
