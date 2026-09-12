@@ -1,4 +1,5 @@
 import { useToast } from '@rific/toaster'
+import type { ViewRotation } from '@tastic/core'
 import { BaseSettingsDialog } from '@tastic/hud'
 
 import { release } from '@/constants/release'
@@ -10,7 +11,7 @@ export interface SettingsDialogProps {
   // Live physical-hold rotation (see @tastic/split-screen's getViewRotation) — this is a centered,
   // app-wide modal with no per-player zone to match, so it just rotates its own content in place;
   // defaults to 0 for a call site that doesn't track one.
-  rotation?: number
+  rotation?: ViewRotation
   // The persisted "next round" settings (not a round's own locked-in activeRoundSettings) — passed
   // in rather than read internally via useGameSettings() so this stays a pure adapter, matching the
   // cross-app SettingsDialog convention (see LightCycles'/BoxHockey's identical props-based
