@@ -1,5 +1,5 @@
 import { Toaster, ToastProvider } from '@rific/toaster'
-import { AccelerometerOrientationProvider, getViewRotation, useAccelerometerOrientation } from '@tastic/split-screen'
+import { getViewRotation, OrientationProvider, useOrientationState } from '@tastic/core'
 import * as Haptics from 'expo-haptics'
 import { Stack } from 'expo-router'
 import { DeviceMotion } from 'expo-sensors'
@@ -10,8 +10,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import * as RNPaper from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
-import { Feedback } from '@/components/Feedback'
 import { Fonts } from '@/components/Fonts'
+import { Providers } from '@/components/Providers'
 import { Theme } from '@/components/Theme'
 import { UpdateDialog } from '@/components/UpdateDialog'
 import { GameSettingsProvider, useGameSettings } from '@/hooks/useGameSettings'
@@ -19,17 +19,17 @@ import { GameStatsProvider } from '@/hooks/useGameStats'
 import { ProfilesProvider, useProfiles } from '@/hooks/useProfiles'
 import { SplashGate } from '@/utils/splashGate'
 
-// A sibling of the Stack, not a wrapper around it — calling useAccelerometerOrientation() here
+// A sibling of the Stack, not a wrapper around it — calling useOrientationState() here
 // rather than in RootLayout itself keeps every live tilt update from re-rendering the whole app
 // tree on every commit. See LightCycles' identical RotationAwareStatusBar for the full reasoning:
 // the real OS status bar can't rotate along with our own virtual content rotation (see
-// @tastic/split-screen's getViewRotation/FakeLandscapeView) — it's always pinned to the device's
+// @tastic/core's getViewRotation/FakeLandscapeView) — it's always pinned to the device's
 // own physical top edge — so once index.tsx/loadout.tsx rotate anything away from right-side-up
 // portrait, the status bar just reads as visually wrong instead of blending in. Hidden whenever the
 // live rotation isn't 0° sidesteps that. /game's own unconditional `<StatusBar hidden />` still
 // layers on top of this one while mounted.
 function RotationAwareStatusBar() {
-  const { orientationMode, p1OnRight, upsideDown } = useAccelerometerOrientation()
+  const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
   const rotation = getViewRotation(orientationMode, p1OnRight, upsideDown)
   return <StatusBar hidden={rotation !== 0} />
 }
@@ -72,7 +72,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <Fonts>
-          <Feedback>
+          <Providers>
             <Theme>
               <GameSettingsProvider>
                 <ProfilesProvider>
@@ -81,28 +81,28 @@ export default function RootLayout() {
                   SettingsReadyGate/ProfilesReadyGate's own docs. */}
                   <SettingsReadyGate>
                     <ProfilesReadyGate>
-                      {/* Mounted once, here, rather than per-screen — see AccelerometerOrientationProvider's
+                      {/* Mounted once, here, rather than per-screen — see OrientationProvider's
                       own doc for why: a single app-lifetime sensor subscription is what makes the
                       committed orientation survive screen navigation, instead of each screen's own hook
                       instance restarting from a default guess on every mount. */}
                       <GameStatsProvider>
                         {/* deviceMotion is the app's own real expo-sensors import, injected rather than
                         imported by @tastic/core itself — see that package's own doc for why. */}
-                        <AccelerometerOrientationProvider deviceMotion={DeviceMotion}>
+                        <OrientationProvider deviceMotion={DeviceMotion}>
                           <ToastProvider haptics={Haptics} paper={RNPaper}>
                             <Stack screenOptions={{ headerShown: false, gestureEnabled: false }} />
                             <RotationAwareStatusBar />
                             <Toaster />
                             <UpdateDialog />
                           </ToastProvider>
-                        </AccelerometerOrientationProvider>
+                        </OrientationProvider>
                       </GameStatsProvider>
                     </ProfilesReadyGate>
                   </SettingsReadyGate>
                 </ProfilesProvider>
               </GameSettingsProvider>
             </Theme>
-          </Feedback>
+          </Providers>
         </Fonts>
       </SafeAreaProvider>
     </GestureHandlerRootView>

@@ -1,6 +1,6 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { Button, IconButton } from '@rific/feedback-press'
-import { FakeLandscapeView, getViewRotation, rotateInsets, useAccelerometerOrientation } from '@tastic/split-screen'
+import { FakeLandscapeView, getViewRotation, rotateInsets, useOrientationState } from '@tastic/core'
 import { router } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -15,8 +15,8 @@ export default function HomeScreen() {
   const { settings, setSettings } = useGameSettings()
   // No P1/P2 concept on this screen at all, but the rotation angle itself still needs the real
   // p1OnRight reading (which direction the device was actually turned) to pick the correct sign —
-  // see @tastic/split-screen's FakeLandscapeView/getViewRotation.
-  const { orientationMode, p1OnRight, upsideDown } = useAccelerometerOrientation(settings.lockOrientation)
+  // see @tastic/core's FakeLandscapeView/getViewRotation.
+  const { orientationMode, p1OnRight, upsideDown } = useOrientationState(settings.lockOrientation)
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { colors, dark } = useAutoPaperTheme()
@@ -43,7 +43,7 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
       {/* Reads correctly no matter which way the phone is actually being held — see
-      @tastic/split-screen's FakeLandscapeView. SettingsDialog stays outside it (a centered
+      @tastic/core's FakeLandscapeView. SettingsDialog stays outside it (a centered
       Portal-rendered modal isn't affected by a local transform on an ancestor) but still gets the
       same live `rotation` passed directly, rotating its own content in place instead. */}
       <FakeLandscapeView orientationMode={orientationMode} p1OnRight={p1OnRight} upsideDown={upsideDown} style={styles.rotatable}>

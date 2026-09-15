@@ -49,7 +49,7 @@ export interface GameSettings {
   gameMode: GameMode
   scoreToWin: number
   aiDifficulty: AiDifficulty
-  // Opt-in — see @tastic/split-screen's useAccelerometerOrientation's own `locked` param. Off by
+  // Opt-in — see @tastic/core's useOrientationState's own `locked` param. Off by
   // default: /loadout's panel arrangement (and, in-game, the board's goal axis — see GoalAxis)
   // just follows however the device is actually being
   // held, rather than being a stored preference itself.

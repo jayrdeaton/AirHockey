@@ -11,7 +11,7 @@ type PaddleTargets = Record<Player, { x: number; y: number }>
 type Action = { type: 'TICK'; board: BoardLayout; dt: number; targets: PaddleTargets } | { type: 'START' } | { type: 'GOAL_SERVE'; board: BoardLayout; zoneIndex: 0 | 1 } | { type: 'RESET'; board: BoardLayout } | { type: 'RESCALE'; prevBoard: BoardLayout; board: BoardLayout }
 
 // Puck/paddle positions are stored in absolute pixels tied to a specific BoardLayout, but board
-// itself can change at any moment — not just once at mount: useSafeAreaInsets/useAccelerometerOrientation
+// itself can change at any moment — not just once at mount: useSafeAreaInsets/useOrientationState
 // both resolve asynchronously after game.tsx's first paint, a live browser/window resize can fire at
 // any time, and rotating the device mid-rally genuinely changes GoalAxis. Remaps a point by its
 // FRACTIONAL position within the old board's playing field onto the same fraction of the new
@@ -180,7 +180,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
 
   // useReducer's lazy init (the `board` argument passed to useReducer below) only ever runs ONCE,
   // at this hook's very first mount — but `board` itself can change again at any later point too:
-  // useSafeAreaInsets/useAccelerometerOrientation both resolve asynchronously after game.tsx's first paint, a
+  // useSafeAreaInsets/useOrientationState both resolve asynchronously after game.tsx's first paint, a
   // live window resize can fire at any time, and rotating the device mid-rally genuinely changes
   // GoalAxis. Rescaling on every board change (see rescalePoint above), not just while idle, is
   // what actually keeps the puck/paddles' absolute-pixel positions sane across all of those —

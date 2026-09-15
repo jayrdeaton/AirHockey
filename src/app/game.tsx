@@ -1,8 +1,8 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
-import { rotateInsets, useAccelerometerOrientation } from '@tastic/split-screen'
-import { router } from 'expo-router'
+import { rotateInsets, useOrientationState } from '@tastic/core'
+import { ConfirmDialog } from '@tastic/hud'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -59,7 +59,7 @@ export default function GameScreen() {
   // activeRoundSettings above) are only needed to hand off to SettingsDialog below — its Lock
   // Orientation/Edge Guard toggles edit the persisted defaults, not this already-underway round's
   // own snapshot.
-  const { activeRoundSettings, settings, setSettings } = useGameSettings()
+  const { activeRoundSettings, settings, setSettings, setIsActivelyPlaying } = useGameSettings()
   const { recordMatchOutcome } = useGameStats()
   const { lastSelected } = useProfiles()
   const { success: showAchievementToast } = useToast()
@@ -79,7 +79,7 @@ export default function GameScreen() {
   // board adapts to either orientation (see GoalAxis's own doc comment in types/index.ts) — so
   // this only pins the reading at all when the player has explicitly opted in via
   // GameSettings.lockOrientation, freezing whichever orientation happens to be live at that moment.
-  const { orientationMode, p1OnRight } = useAccelerometerOrientation(roundSettings.lockOrientation)
+  const { orientationMode, p1OnRight } = useOrientationState(roundSettings.lockOrientation)
   const goalAxis: GoalAxis = orientationMode === 'sideBySide' ? 'horizontal' : 'vertical'
 
   const { width, height } = useWindowDimensions()
@@ -88,7 +88,7 @@ export default function GameScreen() {
   // comment in types/index.ts) regardless of goalAxis — goalAxis only decides which real screen
   // dimension feeds its short-vs-long split, not the shape of what it hands back. So this ±90°
   // exists to visually turn that always-tall container into a landscape-looking one whenever
-  // goalAxis is 'horizontal' — unlike @tastic/split-screen's own getViewRotation (which compensates
+  // goalAxis is 'horizontal' — unlike @tastic/core's own getViewRotation (which compensates
   // specifically for a portrait-locked OS refusing to rotate its render surface), this need is
   // unrelated to OS lock state and applies on every platform, web included.
   const rotationDeg: 0 | 90 | -90 = goalAxis === 'horizontal' ? (p1OnRight ? 90 : -90) : 0
@@ -96,7 +96,7 @@ export default function GameScreen() {
   // Unlike the rotation above, THIS swap is genuinely native-only: computeBoardLayout expects
   // screenWidth/screenHeight to reflect the VISUAL orientation directly (width > height once truly
   // in landscape) — true on web, where the browser window itself is already the correct shape once
-  // wide (useAccelerometerOrientation's own web fallback derives 'horizontal' from exactly that), so
+  // wide (useOrientationState's own web fallback derives 'horizontal' from exactly that), so
   // useWindowDimensions() there is used as-is. Native is portrait-locked at the OS level, so
   // useWindowDimensions() always reports portrait W×H no matter how the phone is actually held —
   // swapped here, at this one call site, to re-derive what genuine landscape dimensions would have
@@ -136,6 +136,18 @@ export default function GameScreen() {
 
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
   const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide } = state
+
+  // Mirrors "an actual live rally, not paused" up to useGameSettings.tsx's own useEdgeGestureGuard
+  // call rather than calling that hook directly here: it stays mounted once at the provider (same
+  // as every other cross-cutting settings concern in this app), and this is just the one signal it
+  // has no other way to read. Unlocked between points (idle/goalScored/gameOver) and whenever a
+  // dialog is open (paused) — back/settings stay unconditionally visible here (unlike Snake/
+  // LightCycles), so there's no button-visibility signal to key off instead. Reset to false on
+  // unmount too, so leaving this screen mid-rally by any path can't leave Edge Guard stuck on.
+  useEffect(() => {
+    setIsActivelyPlaying(phase === 'live' && !paused)
+    return () => setIsActivelyPlaying(false)
+  }, [phase, paused, setIsActivelyPlaying])
 
   useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
 
@@ -283,35 +295,36 @@ export default function GameScreen() {
             <Button mode='contained' onPress={() => resetGame(board)} style={styles.overlayButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
               Play Again
             </Button>
-            <Button mode='contained' onPress={() => router.back()} style={styles.overlayButton} buttonColor={playerColor[winner]} textColor={playerOnColor[winner]}>
+            <Button mode='contained' onPress={safeBack} style={styles.overlayButton} buttonColor={playerColor[winner]} textColor={playerOnColor[winner]}>
               Loadout
             </Button>
           </View>
         </View>
       )}
 
-      {/* Quit confirmation — same rotationStyle treatment as the Game Over card above. */}
-      {confirmBackVisible && (
-        <View style={styles.overlay}>
-          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }, rotationStyle]}>
-            <Icon source='alert-circle-outline' size={64} color={themeColors.secondary} />
-            <Text variant='headlineLarge' style={[styles.overlayTitle, { color: themeColors.secondary, fontFamily: MONO_FONT }]}>
-              Quit Match?
-            </Text>
-            <Text variant='bodyLarge' style={[styles.overlayScore, { fontFamily: MONO_FONT }]}>
-              <Text style={{ color: playerColor[1] }}>{scores[0]}</Text>
-              <Text style={{ color: fgMuted }}> – </Text>
-              <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
-            </Text>
-            <Button mode='contained' onPress={() => setConfirmBackVisible(false)} style={styles.overlayButton} buttonColor={themeColors.primary} textColor={themeColors.onPrimary}>
-              Cancel
-            </Button>
-            <Button mode='contained' onPress={safeBack} style={styles.overlayButton} buttonColor={themeColors.secondary} textColor={themeColors.onSecondary}>
-              Quit
-            </Button>
-          </View>
-        </View>
-      )}
+      {/* Quit confirmation — now the fleet-shared @tastic/hud ConfirmDialog rather than a hand-
+      rolled overlay. rotation={rotationDeg} is the same physical-hold-compensating rotation the
+      board/other floating UI use (see rotationDeg's own comment above), not a fresh computation.
+      Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
+      shared component's primary accent and default font — an accepted trade-off. */}
+      <ConfirmDialog
+        visible={confirmBackVisible}
+        title='Quit Match?'
+        message={
+          <>
+            <Text style={{ color: playerColor[1] }}>{scores[0]}</Text>
+            <Text style={{ color: fgMuted }}> – </Text>
+            <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
+          </>
+        }
+        confirmLabel='Quit'
+        cancelLabel='Cancel'
+        icon='alert-circle-outline'
+        destructive={false}
+        onConfirm={safeBack}
+        onCancel={() => setConfirmBackVisible(false)}
+        rotation={rotationDeg}
+      />
 
       {/* Back + settings — anchored to the board's own top corners in LOCAL space (board.x/y), then
           mapped to a real screen position via localToScreen using the SAME rotationDeg the board's
