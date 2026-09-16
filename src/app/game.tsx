@@ -296,7 +296,7 @@ export default function GameScreen() {
               Play Again
             </Button>
             <Button mode='contained' onPress={safeBack} style={styles.overlayButton} buttonColor={playerColor[winner]} textColor={playerOnColor[winner]}>
-              Loadout
+              Quit
             </Button>
           </View>
         </View>

@@ -117,3 +117,14 @@ export const GOAL_SERVE_PAUSE_MS = 900
 // one context that fixes the board to TABLE_LONG_TO_SHORT_RATIO and draws literal perimeter
 // walls, since there's no physical device edge of its own to lean on there.
 export const DESKTOP_WEB_MIN_WIDTH = 768
+
+// Also the app's own theme identity: redux/store.ts feeds these straight into @rific/auto-paper as
+// the primary/secondary of its color triad (tertiary derived via getThirdColor) AND as
+// redux/seatColorsSlice.ts's own default "remembered" seat colors, so a fresh install's live theme
+// and its guest-color memory can never drift apart. Moved here (rather than living in
+// components/Theme.tsx, where they lived pre-Redux) specifically so the Redux store module — which
+// must seed its theme reducer with these — never has to import a React component file to get them;
+// this is a plain, framework-free constants module, same role Snake's SNAKE_COLORS plays in its own
+// utils/snakeEngine.ts. Values unchanged from Theme.tsx's own prior DEFAULT_P1_COLOR/DEFAULT_P2_COLOR.
+export const DEFAULT_P1_COLOR = '#f44336'
+export const DEFAULT_P2_COLOR = '#2196f3'
