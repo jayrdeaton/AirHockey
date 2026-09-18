@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFonts } from 'expo-font'
 import { ReactNode } from 'react'
 
-import { useSplashReady } from '@/utils/splashGate'
+import { SplashGate } from '@/utils/splashGate'
 
 interface Props {
   children: ReactNode
@@ -12,8 +12,16 @@ interface Props {
 // MaterialCommunityIcons glyph font has actually loaded — otherwise every react-native-paper
 // Icon/IconButton (and @rific/feedback-press's IconButton, which wraps paper's under the hood)
 // would render blank for one visible frame before snapping in once the async load resolves.
+// Gated via the Gate component (SplashGate, per splashGate.ts's own alias) rather than a
+// hand-rolled `useSplashReady` call plus an unconditional `<>{children}</>` — that combination
+// only ever held the NATIVE splash screen up, not the JS tree itself, so a react-native-paper icon
+// could still render blank for one frame before the font resolved even though the native splash
+// had already waited for it. Matches Pong's own fix for the identical gap.
 export function Fonts({ children }: Props) {
   const [loaded] = useFonts({ ...MaterialCommunityIcons.font })
-  useSplashReady('fonts', loaded)
-  return <>{children}</>
+  return (
+    <SplashGate gate='fonts' ready={loaded}>
+      {children}
+    </SplashGate>
+  )
 }

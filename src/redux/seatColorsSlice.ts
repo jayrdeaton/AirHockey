@@ -1,40 +1,23 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
+import { createSeatColorsSlice, type SeatColorsState as SeatColorsStateGeneric } from '@tastic/profile'
 
 import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR } from '@/constants/game'
 import type { Player } from '@/types'
 
-// /loadout's own dedicated "remember this for next time" memory — independent of the live theme
-// snapshot (redux/store.ts's own `theme` slice, @rific/auto-paper's createThemeReducer). Mirrors
-// Snake's redux/gameSlice.ts lastGuestColor/lastCpuColor fields one-for-one, just split into its
-// own small slice (matching this app's own profileSelectionSlice.ts convention) rather than folded
-// into a larger settings/game slice — AirHockey has no such slice of its own to extend, unlike Snake.
-export type SeatColorsState = {
-  // /loadout's own last-picked color per human seat, remembered only for whichever round that seat
-  // was a guest (no profile selected) — a profile-selected seat's color always comes live from the
-  // profile itself instead (see /loadout's own reconciliation effect), never from here.
-  lastGuestColor: Record<Player, string>
-  // Same idea as lastGuestColor, but for seat 2's CPU slot in Vs CPU — kept separate so a CPU
-  // opponent's last color and a human guest's last color don't fight over one remembered value
-  // (seat 1 is never CPU in this app — see types/index.ts's GameMode/PlayerSetupPanel's cpu wiring).
-  lastCpuColor: string
-}
+// Thin binding over @tastic/profile's createSeatColorsSlice factory — this app's own hand-rolled
+// seatColorsSlice.ts (lastGuestColor/lastCpuColor/profileOverride, one-for-one identical to
+// BoxHockey's/LightCycles'/Pong's own copies apart from the seat type and default-color constants)
+// was folded into that factory; see the factory's own doc for the full history, including why
+// Snake's own copy — folded into its catch-all gameSlice.ts instead of a standalone slice — was
+// intentionally left out of this generalization.
+export type SeatColorsState = SeatColorsStateGeneric<Player>
 
 export const defaultSeatColorsState: SeatColorsState = {
   lastGuestColor: { 1: DEFAULT_P1_COLOR, 2: DEFAULT_P2_COLOR },
-  lastCpuColor: DEFAULT_P2_COLOR
+  lastCpuColor: DEFAULT_P2_COLOR,
+  profileOverride: { 1: null, 2: null }
 }
 
-const slice = createSlice({
-  name: 'seatColors',
-  initialState: defaultSeatColorsState,
-  reducers: {
-    setLastGuestColor: (state, action: PayloadAction<{ seat: Player; color: string }>) => ({
-      ...state,
-      lastGuestColor: { ...state.lastGuestColor, [action.payload.seat]: action.payload.color }
-    }),
-    setLastCpuColor: (state, action: PayloadAction<string>) => ({ ...state, lastCpuColor: action.payload })
-  }
-})
+const { actions, reducer } = createSeatColorsSlice<Player>('airhockey', defaultSeatColorsState)
 
-export const seatColorsActions = slice.actions
-export default slice.reducer
+export const seatColorsActions = actions
+export default reducer

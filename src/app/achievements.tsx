@@ -1,6 +1,7 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
-import { ACHIEVEMENT_TIER_COLORS, unlockedKey } from '@tastic/achievements'
-import { AchievementRow, BaseStatsScreen, LOCKED_BADGE_COLOR, StatRow, StatSection, usePopoverHost } from '@tastic/hud'
+import { getAchievementCatalogRows } from '@tastic/achievements'
+import { FakeLandscapeView, rotateInsets, useRotation } from '@tastic/core'
+import { AchievementCatalogSection, ActivityStatSection, BaseStatsScreen, StatRow, StatSection, usePopoverHost } from '@tastic/hud'
 import { ProfileChip, ProfilePicker } from '@tastic/profile'
 import { useMemo, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
@@ -14,22 +15,6 @@ import { useProfiles } from '@/hooks/useProfiles'
 import { safeBack } from '@/utils/navigation'
 import { getOverallTotals, getProfileRankings, getProfileStatsView, ProfileRanking } from '@/utils/statsEngine'
 import { DEFAULT_PROFILE_STATS } from '@/utils/statsValidation'
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000
-
-// Calendar-day difference, not raw elapsed time, so an achievement unlocked at 11pm reads as "1 day
-// ago" once the date rolls over rather than 24 hours later. Stays local: @tastic/hud's
-// AchievementRow takes a precomputed label, since date conventions vary per app.
-function startOfDay(date: Date): number {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-}
-
-function unlockedLabel(unlockedAt: number): string {
-  const days = Math.round((startOfDay(new Date()) - startOfDay(new Date(unlockedAt))) / MS_PER_DAY)
-  if (days <= 0) return 'Unlocked today'
-  if (days === 1) return 'Unlocked 1 day ago'
-  return `Unlocked ${days} days ago`
-}
 
 interface ProfileRankingRowProps {
   ranking: ProfileRanking
@@ -59,7 +44,15 @@ function ProfileRankingRow({ ranking, fg, fgMuted }: ProfileRankingRowProps) {
 
 export default function AchievementsScreen() {
   const { dark, colors: themeColors } = useAutoPaperTheme()
-  const insets = useSafeAreaInsets()
+  // Unlike index.tsx/loadout.tsx, this screen previously had no orientation handling at all — it
+  // always rendered right-side-up regardless of how the phone was actually being held, the one
+  // screen in the app that didn't rotate along with everywhere else. rotateInsets remaps the
+  // device's own raw (never-rotated) safe-area reading onto whichever edge it actually corresponds
+  // to once FakeLandscapeView below visually rotates the content — see index.tsx's identical
+  // comment for the full reasoning (and BoxHockey's own achievements.tsx, which already carried
+  // this fix before AirHockey's copy did).
+  const rotation = useRotation()
+  const insets = rotateInsets(useSafeAreaInsets(), rotation)
   const { stats, unlockedAchievements, loaded, resetAll } = useGameStats()
   const { profiles } = useProfiles()
   const profilePickerHost = usePopoverHost()
@@ -88,87 +81,73 @@ export default function AchievementsScreen() {
   // has rendered yet.
   if (!loaded) {
     return (
-      <BaseStatsScreen onBack={safeBack} insets={insets}>
-        <Text style={{ color: fgMuted, fontFamily: MONO_FONT }}>Loading…</Text>
-      </BaseStatsScreen>
+      <FakeLandscapeView style={styles.rotatable}>
+        <BaseStatsScreen onBack={safeBack} insets={insets} rotation={rotation}>
+          <Text style={{ color: fgMuted, fontFamily: MONO_FONT }}>Loading…</Text>
+        </BaseStatsScreen>
+      </FakeLandscapeView>
     )
   }
 
   return (
-    <BaseStatsScreen onBack={safeBack} insets={insets} onReset={resetAll}>
-      {profiles.length > 0 && <ProfilePicker idPrefix='achievements' host={profilePickerHost} profiles={profiles} selectedId={effectiveProfileId} color={themeColors.primary} dark={dark} guestLabel='All Profiles' nullLabel='All Profiles' nullIcon='account-group' onSelect={(profile) => setSelectedProfileId(profile?.id ?? null)} />}
+    <FakeLandscapeView style={styles.rotatable}>
+      <BaseStatsScreen onBack={safeBack} insets={insets} onReset={resetAll} rotation={rotation}>
+        {profiles.length > 0 && <ProfilePicker idPrefix='achievements' host={profilePickerHost} profiles={profiles} selectedId={effectiveProfileId} color={themeColors.primary} dark={dark} guestLabel='All Profiles' nullLabel='All Profiles' nullIcon='account-group' onSelect={(profile) => setSelectedProfileId(profile?.id ?? null)} />}
 
-      <StatSection label='OVERALL'>
-        <StatRow label='Played' value={String(overall.played)} />
-        <StatRow label='Wins' value={String(overall.wins)} />
-        <StatRow label='Losses' value={String(overall.losses)} />
-      </StatSection>
-
-      <StatSection label='GOALS'>
-        <StatRow label='Scored' value={String(statsView.goals.scored)} />
-        <StatRow label='Conceded' value={String(statsView.goals.conceded)} />
-        <StatRow label='Difference' value={goalDiff > 0 ? `+${goalDiff}` : String(goalDiff)} />
-        <StatRow label='Shutouts' value={String(statsView.shutouts)} />
-        <StatRow label='Best Win Margin' value={String(statsView.bestWinMargin)} />
-        <StatRow label='Goal Door Hits' value={String(statsView.goalDoorHits)} />
-      </StatSection>
-
-      <StatSection label='VS CPU'>
-        <StatRow label='Record (W-L)' value={`${statsView.vsCpu.wins}-${statsView.vsCpu.losses}`} />
-        <StatRow label='Current Streak' value={String(statsView.vsCpu.currentWinStreak)} />
-        <StatRow label='Best Streak' value={String(statsView.vsCpu.bestWinStreak)} />
-      </StatSection>
-
-      {/* All Profiles keeps the seat framing (whoever sat where); a selected profile switches to
-      that profile's own record, where p1Wins+p2Wins is always THIS profile's own win count. */}
-      <StatSection label='TWO PLAYER (LOCAL)'>
-        {profileBucket ? (
-          <>
-            <StatRow label='Played' value={String(statsView.twoPlayer.played)} />
-            <StatRow label='Wins' value={String(statsView.twoPlayer.p1Wins + statsView.twoPlayer.p2Wins)} />
-            <StatRow label='Losses' value={String(statsView.twoPlayer.played - statsView.twoPlayer.p1Wins - statsView.twoPlayer.p2Wins)} />
-          </>
-        ) : (
-          <>
-            <StatRow label='Played' value={String(stats.twoPlayer.played)} />
-            <StatRow label='Seat 1 Wins' value={String(stats.twoPlayer.p1Wins)} />
-            <StatRow label='Seat 2 Wins' value={String(stats.twoPlayer.p2Wins)} />
-          </>
-        )}
-      </StatSection>
-
-      {/* A leaderboard across profiles is inherently a cross-profile question, so it only appears
-      on "All Profiles" — once you've drilled into one profile it answers a different question. */}
-      {effectiveProfileId === null && rankings.length > 0 && (
-        <StatSection label='PLAYER RANKINGS'>
-          {rankings.map((ranking) => (
-            <ProfileRankingRow key={ranking.profile.id} ranking={ranking} fg={fg} fgMuted={fgMuted} />
-          ))}
+        <StatSection label='OVERALL'>
+          <StatRow label='Played' value={String(overall.played)} />
+          <StatRow label='Wins' value={String(overall.wins)} />
+          <StatRow label='Losses' value={String(overall.losses)} />
         </StatSection>
-      )}
 
-      <StatSection label='ACTIVITY'>
-        <StatRow label='Days Played' value={String(statsView.distinctDaysPlayed)} />
-        <StatRow label='Day Streak' value={String(statsView.currentDayStreak)} />
-        <StatRow label='Best Day Streak' value={String(statsView.bestDayStreak)} />
-      </StatSection>
+        <StatSection label='GOALS'>
+          <StatRow label='Scored' value={String(statsView.goals.scored)} />
+          <StatRow label='Conceded' value={String(statsView.goals.conceded)} />
+          <StatRow label='Difference' value={goalDiff > 0 ? `+${goalDiff}` : String(goalDiff)} />
+          <StatRow label='Shutouts' value={String(statsView.shutouts)} />
+          <StatRow label='Best Win Margin' value={String(statsView.bestWinMargin)} />
+          <StatRow label='Goal Door Hits' value={String(statsView.goalDoorHits)} />
+        </StatSection>
 
-      <Text variant='labelMedium' style={[styles.listLabel, { color: fgMuted, fontFamily: MONO_FONT }]}>
-        ALL ACHIEVEMENTS
-      </Text>
-      {ACHIEVEMENT_CATALOG.map((achievement) => {
-        // scope:'device' always evaluates against the real device stats and its bare-id key,
-        // regardless of which tab is active; everything else follows the selected view. On "All
-        // Profiles" both branches collapse to the same thing.
-        const scope = achievement.scope ?? 'profile'
-        const evalStats = scope === 'device' ? stats : statsView
-        const key = unlockedKey(achievement.id, scope === 'device' ? null : effectiveProfileId)
-        const unlockedAt = unlockedAchievements[key]
-        const progress = unlockedAt === undefined ? achievement.progress?.(evalStats) : undefined
-        const tierColor = ACHIEVEMENT_TIER_COLORS[achievement.tier]
-        return <AchievementRow key={achievement.id} icon={achievement.icon} title={achievement.title} description={achievement.description} badgeColor={unlockedAt !== undefined ? tierColor : LOCKED_BADGE_COLOR} checkColor={tierColor} unlockedLabel={unlockedAt !== undefined ? unlockedLabel(unlockedAt) : undefined} progress={progress} deviceMarker={effectiveProfileId !== null && scope === 'device'} />
-      })}
-    </BaseStatsScreen>
+        <StatSection label='VS CPU'>
+          <StatRow label='Record (W-L)' value={`${statsView.vsCpu.wins}-${statsView.vsCpu.losses}`} />
+          <StatRow label='Current Streak' value={String(statsView.vsCpu.currentWinStreak)} />
+          <StatRow label='Best Streak' value={String(statsView.vsCpu.bestWinStreak)} />
+        </StatSection>
+
+        {/* All Profiles keeps the seat framing (whoever sat where); a selected profile switches to
+      that profile's own record, where p1Wins+p2Wins is always THIS profile's own win count. */}
+        <StatSection label='TWO PLAYER (LOCAL)'>
+          {profileBucket ? (
+            <>
+              <StatRow label='Played' value={String(statsView.twoPlayer.played)} />
+              <StatRow label='Wins' value={String(statsView.twoPlayer.p1Wins + statsView.twoPlayer.p2Wins)} />
+              <StatRow label='Losses' value={String(statsView.twoPlayer.played - statsView.twoPlayer.p1Wins - statsView.twoPlayer.p2Wins)} />
+            </>
+          ) : (
+            <>
+              <StatRow label='Played' value={String(stats.twoPlayer.played)} />
+              <StatRow label='Seat 1 Wins' value={String(stats.twoPlayer.p1Wins)} />
+              <StatRow label='Seat 2 Wins' value={String(stats.twoPlayer.p2Wins)} />
+            </>
+          )}
+        </StatSection>
+
+        {/* A leaderboard across profiles is inherently a cross-profile question, so it only appears
+      on "All Profiles" — once you've drilled into one profile it answers a different question. */}
+        {effectiveProfileId === null && rankings.length > 0 && (
+          <StatSection label='PLAYER RANKINGS'>
+            {rankings.map((ranking) => (
+              <ProfileRankingRow key={ranking.profile.id} ranking={ranking} fg={fg} fgMuted={fgMuted} />
+            ))}
+          </StatSection>
+        )}
+
+        <ActivityStatSection stats={statsView} />
+
+        <AchievementCatalogSection rows={getAchievementCatalogRows(ACHIEVEMENT_CATALOG, stats, statsView, unlockedAchievements, effectiveProfileId)} />
+      </BaseStatsScreen>
+    </FakeLandscapeView>
   )
 }
 
@@ -176,14 +155,16 @@ const styles = StyleSheet.create({
   boldText: {
     fontWeight: 'bold'
   },
-  listLabel: {
-    letterSpacing: 2,
-    marginTop: 8
-  },
   profileValue: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 8
+  },
+  // Everything visible sits inside FakeLandscapeView now, which needs a real (not shrink-wrapped)
+  // full-bleed box to size its own ±90° dimension-swap math against correctly — see index.tsx's
+  // identical style/comment.
+  rotatable: {
+    flex: 1
   },
   statRow: {
     alignItems: 'center',

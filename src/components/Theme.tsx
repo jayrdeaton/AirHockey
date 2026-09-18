@@ -1,4 +1,4 @@
-import { Provider as AutoPaperProvider, themeActions, type ThemeSettings } from '@rific/auto-paper'
+import { Provider as AutoPaperProvider, themeActions, type ThemeSettings, useThemeBridgeProps } from '@rific/auto-paper'
 import * as SplashScreen from 'expo-splash-screen'
 import { ReactNode, useCallback } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
@@ -35,10 +35,7 @@ export function Theme({ children }: Props) {
   // avoid AutoPaperProvider's own lazy initializer locking in a still-loading value). This just marks
   // the 'theme' gate (see src/utils/splashGate.ts) once AutoPaperProvider has computed a real theme.
   const onReady = useCallback(() => markSplashReady('theme'), [])
+  const bridgeProps = useThemeBridgeProps({ initialValue: settings, onChange, onReady })
 
-  return (
-    <AutoPaperProvider initialValue={settings} onChange={onChange} onReady={onReady}>
-      {children}
-    </AutoPaperProvider>
-  )
+  return <AutoPaperProvider {...bridgeProps}>{children}</AutoPaperProvider>
 }

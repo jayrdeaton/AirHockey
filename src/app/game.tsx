@@ -1,8 +1,10 @@
 import { useAutoPaperTheme } from '@rific/auto-paper'
 import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
+import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useOrientationState } from '@tastic/core'
-import { ConfirmDialog } from '@tastic/hud'
+import { ConfirmDialog, useQuitConfirmation } from '@tastic/hud'
+import { Profile, ProfileChip } from '@tastic/profile'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -22,7 +24,7 @@ import { useGameSound } from '@/hooks/useGameSound'
 import { useGameState } from '@/hooks/useGameState'
 import { useGameStats } from '@/hooks/useGameStats'
 import { useProfiles } from '@/hooks/useProfiles'
-import { GoalAxis, Player } from '@/types'
+import { AchievementDefinition, GoalAxis, Player } from '@/types'
 import { computeBoardLayout, computeLocalContainerSize } from '@/utils/board'
 import { humanPlayersFor } from '@/utils/gameMode'
 import { DEFAULT_SETTINGS } from '@/utils/gameSettingsValidation'
@@ -61,7 +63,7 @@ export default function GameScreen() {
   // own snapshot.
   const { activeRoundSettings, settings, setSettings, setIsActivelyPlaying } = useGameSettings()
   const { recordMatchOutcome } = useGameStats()
-  const { lastSelected } = useProfiles()
+  const { profiles, lastSelected } = useProfiles()
   const { success: showAchievementToast } = useToast()
   const roundSettings = activeRoundSettings ?? DEFAULT_SETTINGS
   const scoreToWin = roundSettings.scoreToWin
@@ -129,10 +131,22 @@ export default function GameScreen() {
   const screenCenterX = insets.left + outerWidth / 2
   const screenCenterY = insets.top + outerHeight / 2
 
-  // Settings/quit-confirm dialogs pause gameplay while open.
+  // Settings/quit-confirm dialogs pause gameplay while open. useQuitConfirmation reads hasProgress
+  // lazily (only inside a real requestBack() call, via its own ref-mirrored getter — see that
+  // hook's own doc) rather than taking a plain boolean, which is exactly what makes this safe to
+  // call before `scores` exists yet: `scores` comes from useGameState's returned state, which
+  // itself needs `paused` (derived from confirmVisible) as an INPUT, so a plain-boolean argument
+  // computed from `scores` here would be a real circular render dependency. The closure below
+  // still reads whatever `scores` is bound to at the time the closure itself is (re)created each
+  // render, same as a hand-rolled onBackPress body always did before this hook existed.
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [confirmBackVisible, setConfirmBackVisible] = useState(false)
-  const paused = settingsOpen || confirmBackVisible
+  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => scores[0] > 0 || scores[1] > 0, safeBack)
+  const paused = settingsOpen || confirmVisible
+
+  // Two-player (pass-and-play) only — seat -> that seat's own newly-unlocked achievements this
+  // match, read by the two-player Game Over overlay below to badge each seat correctly (see the
+  // gameOver effect below for why this replaces showAchievementToast for that mode specifically).
+  const [seatUnlocks, setSeatUnlocks] = useState<Partial<Record<Player, AchievementDefinition[]>>>({})
 
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
   const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide } = state
@@ -164,6 +178,9 @@ export default function GameScreen() {
   const playerOnColor: Record<Player, string> = { 1: themeColors.onPrimary, 2: themeColors.onSecondary }
   const winner: Player = scores[0] >= scoreToWin ? 1 : 2
   const loser: Player = winner === 1 ? 2 : 1
+  // Whichever profile each seat had selected, if any — read the same way Pong's own game.tsx looks
+  // theirs up, so the two-player achievement badges below can identify whose unlock is whose.
+  const seatProfile: Partial<Record<Player, Profile>> = { 1: profiles.find((p) => p.id === lastSelected[1]) ?? undefined, 2: profiles.find((p) => p.id === lastSelected[2]) ?? undefined }
 
   const vibration = useVibration()
   const vibrationRef = useRef(vibration)
@@ -178,11 +195,6 @@ export default function GameScreen() {
   useEffect(() => {
     soundRef.current = { playBounce, playGoal, playWin }
   })
-
-  const onBackPress = () => {
-    if (scores[0] > 0 || scores[1] > 0) setConfirmBackVisible(true)
-    else safeBack()
-  }
 
   const firstBounceRender = useRef(true)
   useEffect(() => {
@@ -213,10 +225,28 @@ export default function GameScreen() {
       const matchWinner: Player = scores[0] >= scoreToWin ? 1 : 2
       const profileIds = { 1: lastSelected[1] ?? undefined, 2: aiPlayer === null ? (lastSelected[2] ?? undefined) : undefined }
       const result = recordMatchOutcome({ winner: matchWinner, scores: [scores[0], scores[1]], goalDoorHits: goalDoorHitCount }, { gameMode: roundSettings.gameMode, aiDifficulty, profileIds })
-      const seatUnlocks = aiPlayer === null ? [...(result.profiles[1] ?? []), ...(result.profiles[2] ?? [])] : (result.profiles[1] ?? [])
-      ;[...result.device, ...seatUnlocks].forEach((achievement) => {
-        showAchievementToast(achievement.title, 'Achievement unlocked', undefined, { color: ACHIEVEMENT_TIER_COLORS[achievement.tier], icon: achievement.icon })
-      })
+      if (aiPlayer === null) {
+        // Genuine two-seat pass-and-play — showAchievementToast below is a single, screen-fixed
+        // @rific/toaster call with no rotation of its own, so it only ever reads right-side-up for
+        // whichever seat happens to match the board's current rotationDeg. A player seated at the
+        // opposite end of the table (the far side of a portrait/vertical-goalAxis hold, same as
+        // real air hockey) would see it upside-down even though it's their own achievement.
+        // Broadcasting into seatUnlocks instead lets the two-player Game Over overlay below (which
+        // already carries the board's own rotationStyle) show each seat's own unlocks once the
+        // match settles — same fix Pong's/LightCycles' own game.tsx applies, for the identical
+        // reason. Device-wide achievements have no per-seat owner, but both seats are human here,
+        // so they're broadcast into both seats' own entries rather than dropped or arbitrarily
+        // attributed to one side.
+        const broadcast = broadcastDeviceUnlocks([1, 2] as Player[], result.profiles, result.device)
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- a real one-shot transition guarded by prevPhaseRef above, not a render loop; the sibling vsCpu branch below fires showAchievementToast (which does the same thing inside @rific/toaster) unconditionally in this same effect
+        setSeatUnlocks(broadcast)
+      } else {
+        // vsCpu only ever has one human perspective (seat 1) to address — the shared, screen-fixed
+        // toast is fine here.
+        ;[...result.device, ...(result.profiles[1] ?? [])].forEach((achievement) => {
+          showAchievementToast(achievement.title, 'Achievement unlocked', undefined, { color: ACHIEVEMENT_TIER_COLORS[achievement.tier], icon: achievement.icon })
+        })
+      }
     }
     prevPhaseRef.current = phase
   }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, goalDoorHitCount, lastSelected, roundSettings.gameMode, recordMatchOutcome, showAchievementToast])
@@ -292,6 +322,38 @@ export default function GameScreen() {
               <Text style={{ color: fgMuted }}> – </Text>
               <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
             </Text>
+            {/* Two-player-only achievement badges — see seatUnlocks' own doc above for why these
+            land here instead of the shared showAchievementToast vsCpu still uses. One row per
+            achievement rather than a per-seat count, each tagged with whichever seat's own
+            ProfileChip earned it (falling back to a plain playerColor avatar for a guest seat) —
+            this card already carries a single shared rotationStyle, so that avatar is what
+            actually identifies whose achievement each row is, not a second independent rotation.
+            Matches Pong's own game.tsx badge-row treatment, adapted to this overlay's existing
+            trophy/score/buttons layout rather than also porting its winnerProfile row, which
+            AirHockey's overlay has never shown. */}
+            {aiPlayer === null && (seatUnlocks[1]?.length ?? 0) + (seatUnlocks[2]?.length ?? 0) > 0 && (
+              <View style={styles.achievementList}>
+                {([1, 2] as Player[]).flatMap((player) =>
+                  (seatUnlocks[player] ?? []).map((achievement) => (
+                    <View key={`${player}-${achievement.id}`} style={styles.achievementRow}>
+                      {seatProfile[player] ? (
+                        <ProfileChip profile={seatProfile[player]} size={18} />
+                      ) : (
+                        <View style={[styles.achievementAvatar, { backgroundColor: playerColor[player] }]}>
+                          <Icon source='account' size={10} color={playerOnColor[player]} />
+                        </View>
+                      )}
+                      <View style={[styles.achievementIconBadge, { backgroundColor: ACHIEVEMENT_TIER_COLORS[achievement.tier] }]}>
+                        <Icon source={achievement.icon} size={12} color='#000000' />
+                      </View>
+                      <Text style={[styles.achievementRowLabel, { color: fg }]} numberOfLines={1}>
+                        {achievement.title}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            )}
             <Button mode='contained' onPress={() => resetGame(board)} style={styles.overlayButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
               Play Again
             </Button>
@@ -308,7 +370,7 @@ export default function GameScreen() {
       Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
       shared component's primary accent and default font — an accepted trade-off. */}
       <ConfirmDialog
-        visible={confirmBackVisible}
+        visible={confirmVisible}
         title='Quit Match?'
         message={
           <>
@@ -322,7 +384,7 @@ export default function GameScreen() {
         icon='alert-circle-outline'
         destructive={false}
         onConfirm={safeBack}
-        onCancel={() => setConfirmBackVisible(false)}
+        onCancel={cancelBack}
         rotation={rotationDeg}
       />
 
@@ -339,7 +401,7 @@ export default function GameScreen() {
           only as a single unit for goalAxis — so one shared, non-neutral corner pair is still
           correct; it just has to move and rotate with that unit rotation instead of ignoring it. */}
       <View style={[styles.backButton, { left: backPos.x - 24, top: backPos.y - 24 }]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={onBackPress} />
+        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={requestBack} />
       </View>
       <View style={[styles.settingsButton, { left: settingsPos.x - 24, top: settingsPos.y - 24 }]}>
         <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
@@ -355,6 +417,33 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
+  achievementAvatar: {
+    alignItems: 'center',
+    borderRadius: 9,
+    height: 18,
+    justifyContent: 'center',
+    width: 18
+  },
+  achievementIconBadge: {
+    alignItems: 'center',
+    borderRadius: 9,
+    height: 18,
+    justifyContent: 'center',
+    width: 18
+  },
+  achievementList: {
+    gap: 6
+  },
+  achievementRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6
+  },
+  achievementRowLabel: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '700'
+  },
   backButton: { position: 'absolute' },
   chipButton: { margin: 0 },
   // Deliberately NOT position: 'absolute' — it needs to stay a normal flex child of `viewport`
