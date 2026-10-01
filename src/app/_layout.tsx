@@ -11,6 +11,7 @@ import * as RNPaper from 'react-native-paper'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { Fonts } from '@/components/Fonts'
+import { GuideHost } from '@/components/GuideHost'
 import { Providers } from '@/components/Providers'
 import { Theme } from '@/components/Theme'
 import { UpdateDialog } from '@/components/UpdateDialog'
@@ -95,7 +96,14 @@ export default function RootLayout() {
                       imported by @tastic/core itself — see that package's own doc for why. */}
                       <OrientationProvider deviceMotion={DeviceMotion}>
                         <ToastProvider haptics={Haptics} paper={RNPaper}>
-                          <AppStack />
+                          {/* Wraps the stack (rather than sitting beside it like UpdateDialog) because
+                          Home's useAutoShowGuide() and the Settings dialog's "How to Play" row reach it
+                          through context; see GuideHost's own doc. Must stay inside ToastProvider/
+                          OrientationProvider (the card renders through a Portal and reads the live
+                          tilt) and inside the gate (it reads the loaded settings). */}
+                          <GuideHost>
+                            <AppStack />
+                          </GuideHost>
                           <ConnectedRotationAwareStatusBar />
                           {/* historyButton/clearButton off — this app has no history modal use case
                           for them to open, and a stray control row above the toast stack for a

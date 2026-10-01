@@ -3,8 +3,8 @@ import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useOrientationState } from '@tastic/core'
-import { ConfirmDialog, useQuitConfirmation } from '@tastic/hud'
-import { Profile, ProfileChip } from '@tastic/profile'
+import { AchievementUnlockList, type AchievementUnlockOwner, ConfirmDialog, useQuitConfirmation } from '@tastic/hud'
+import { Profile } from '@tastic/profile'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
@@ -54,6 +54,8 @@ function localToScreen(localX: number, localY: number, containerWidth: number, c
   return { x: screenCenterX + dx, y: screenCenterY + dy }
 }
 
+const SEATS: readonly Player[] = [1, 2]
+
 export default function GameScreen() {
   // Committed once by /loadout when every human player readied up — falls back to defaults for a
   // direct/deep link to this screen, which never went through /loadout to commit anything.
@@ -64,7 +66,7 @@ export default function GameScreen() {
   const { activeRoundSettings, settings, setSettings, setIsActivelyPlaying } = useGameSettings()
   const { recordMatchOutcome } = useGameStats()
   const { profiles, lastSelected } = useProfiles()
-  const { success: showAchievementToast } = useToast()
+  const { clear: clearToasts, success: showAchievementToast } = useToast()
   const roundSettings = activeRoundSettings ?? DEFAULT_SETTINGS
   const scoreToWin = roundSettings.scoreToWin
   const friction = FRICTION_LEVELS[roundSettings.friction]
@@ -163,6 +165,13 @@ export default function GameScreen() {
     return () => setIsActivelyPlaying(false)
   }, [phase, paused, setIsActivelyPlaying])
 
+  // No toast may stay on screen during live play — only between rounds or at game over. Unlock
+  // toasts fire at game over and last 7s, so a quick restart would otherwise carry them into the
+  // next rally.
+  useEffect(() => {
+    if (phase === 'live') clearToasts()
+  }, [phase, clearToasts])
+
   useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
 
   const isDesktopWeb = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
@@ -181,6 +190,7 @@ export default function GameScreen() {
   // Whichever profile each seat had selected, if any — read the same way Pong's own game.tsx looks
   // theirs up, so the two-player achievement badges below can identify whose unlock is whose.
   const seatProfile: Partial<Record<Player, Profile>> = { 1: profiles.find((p) => p.id === lastSelected[1]) ?? undefined, 2: profiles.find((p) => p.id === lastSelected[2]) ?? undefined }
+  const achievementOwners: Record<Player, AchievementUnlockOwner> = { 1: { profile: seatProfile[1], color: playerColor[1] }, 2: { profile: seatProfile[2], color: playerColor[2] } }
 
   const vibration = useVibration()
   const vibrationRef = useRef(vibration)
@@ -322,38 +332,11 @@ export default function GameScreen() {
               <Text style={{ color: fgMuted }}> – </Text>
               <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
             </Text>
-            {/* Two-player-only achievement badges — see seatUnlocks' own doc above for why these
-            land here instead of the shared showAchievementToast vsCpu still uses. One row per
-            achievement rather than a per-seat count, each tagged with whichever seat's own
-            ProfileChip earned it (falling back to a plain playerColor avatar for a guest seat) —
-            this card already carries a single shared rotationStyle, so that avatar is what
-            actually identifies whose achievement each row is, not a second independent rotation.
-            Matches Pong's own game.tsx badge-row treatment, adapted to this overlay's existing
-            trophy/score/buttons layout rather than also porting its winnerProfile row, which
-            AirHockey's overlay has never shown. */}
-            {aiPlayer === null && (seatUnlocks[1]?.length ?? 0) + (seatUnlocks[2]?.length ?? 0) > 0 && (
-              <View style={styles.achievementList}>
-                {([1, 2] as Player[]).flatMap((player) =>
-                  (seatUnlocks[player] ?? []).map((achievement) => (
-                    <View key={`${player}-${achievement.id}`} style={styles.achievementRow}>
-                      {seatProfile[player] ? (
-                        <ProfileChip profile={seatProfile[player]} size={18} />
-                      ) : (
-                        <View style={[styles.achievementAvatar, { backgroundColor: playerColor[player] }]}>
-                          <Icon source='account' size={10} color={playerOnColor[player]} />
-                        </View>
-                      )}
-                      <View style={[styles.achievementIconBadge, { backgroundColor: ACHIEVEMENT_TIER_COLORS[achievement.tier] }]}>
-                        <Icon source={achievement.icon} size={12} color='#000000' />
-                      </View>
-                      <Text style={[styles.achievementRowLabel, { color: fg }]} numberOfLines={1}>
-                        {achievement.title}
-                      </Text>
-                    </View>
-                  ))
-                )}
-              </View>
-            )}
+            {/* Two-player-only achievement rows — see seatUnlocks' own doc above for why these land
+            here instead of the shared showAchievementToast vsCpu still uses. This card already
+            carries a single shared rotationStyle, so each row's owner avatar is what identifies
+            whose achievement it is, not a second independent rotation. */}
+            {aiPlayer === null && <AchievementUnlockList unlocks={seatUnlocks} seats={SEATS} owners={achievementOwners} tierColors={ACHIEVEMENT_TIER_COLORS} fg={fg} />}
             <Button mode='contained' onPress={() => resetGame(board)} style={styles.overlayButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
               Play Again
             </Button>
@@ -417,33 +400,6 @@ export default function GameScreen() {
 }
 
 const styles = StyleSheet.create({
-  achievementAvatar: {
-    alignItems: 'center',
-    borderRadius: 9,
-    height: 18,
-    justifyContent: 'center',
-    width: 18
-  },
-  achievementIconBadge: {
-    alignItems: 'center',
-    borderRadius: 9,
-    height: 18,
-    justifyContent: 'center',
-    width: 18
-  },
-  achievementList: {
-    gap: 6
-  },
-  achievementRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 6
-  },
-  achievementRowLabel: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '700'
-  },
   backButton: { position: 'absolute' },
   chipButton: { margin: 0 },
   // Deliberately NOT position: 'absolute' — it needs to stay a normal flex child of `viewport`

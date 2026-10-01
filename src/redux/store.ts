@@ -2,11 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { combineReducers, configureStore, type Middleware } from '@reduxjs/toolkit'
 import { createThemeReducer, getThirdColor } from '@rific/auto-paper'
 import { defaultSoundSettings, hapticReducer, soundReducer, type SoundSettings } from '@rific/feedback-press'
+import { createReturningPlayerMigrate } from '@tastic/hud/guide'
 import { profilesReducer } from '@tastic/profile'
 import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, REHYDRATE } from 'redux-persist'
 
 import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR } from '@/constants/game'
 
+import guide, { LEGACY_STORAGE_KEYS } from './guideSlice'
 import profileSelection from './profileSelectionSlice'
 import seatColors from './seatColorsSlice'
 
@@ -46,7 +48,12 @@ const rootReducer = combineReducers({
   // available, with no separate hand-rolled AsyncStorage path needed for that case.
   profiles: profilesReducer,
   profileSelection,
-  seatColors
+  seatColors,
+  // Which version of the how-to-play flow this player has finished or skipped, as its own key rather
+  // than a GameSettings field, so it survives 'Reset stats'/'Reset match settings' and never touches
+  // gameSettingsValidation's strict isValidSettings. No whitelist/blacklist below, so it persists
+  // like every other key here. See guideSlice.ts's own doc.
+  guide
 })
 
 const persistConfig = {
@@ -60,7 +67,11 @@ const persistConfig = {
   // pointing straight at persistReducer.js's setTimeout. Disabling it (falsy timeout skips the
   // setTimeout call entirely) is redux-persist's own documented way to opt out; AsyncStorage reads
   // failing to ever resolve at all isn't a failure mode worth a 5s failsafe for.
-  timeout: 0
+  timeout: 0,
+  // Grandfathers players updating from the shipped pre-redux build (a545f43): they have no 'root'
+  // store yet, but do have that build's own AsyncStorage keys, so they rehydrate as existing players
+  // and the guide doesn't auto-show for them. A no-op once 'root' exists. See guideSlice.ts.
+  migrate: createReturningPlayerMigrate(AsyncStorage, LEGACY_STORAGE_KEYS)
 }
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

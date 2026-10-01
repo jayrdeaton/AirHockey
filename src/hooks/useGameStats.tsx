@@ -6,7 +6,7 @@ import { AchievementDefinition, Player, StatsState, UnlockedAchievementsState } 
 import { applyMatchOutcome, getProfileStatsView, MatchContext, MatchOutcome } from '@/utils/statsEngine'
 import { DEFAULT_STATS, isValidStats } from '@/utils/statsValidation'
 
-// Produces 'airhockey.stats' and 'boxhockey.achievements'.
+// Produces 'airhockey.stats' and 'airhockey.achievements' (@tastic/achievements builds both from this namespace).
 const STORAGE_NAMESPACE = 'airhockey'
 
 export interface RecordMatchResult {
