@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "AirHockey",
-    "slug": "air-hockey",
+    "slug": "AirHockey",
     "version": "1.0.0",
     "scheme": "airhockey",
     "description": "A digital AirHockey game",
@@ -78,12 +78,12 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8ad06de8-8fe8-4351-af92-440e79f0f328"
+        "projectId": "00f202c0-d7a0-4422-afac-96501474d668"
       }
     },
     "owner": "jayrdeaton",
     "updates": {
-      "url": "https://u.expo.dev/8ad06de8-8fe8-4351-af92-440e79f0f328"
+      "url": "https://u.expo.dev/00f202c0-d7a0-4422-afac-96501474d668"
     }
   }
 }
