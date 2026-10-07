@@ -19,8 +19,8 @@ export interface KeyboardInputLayerProps {
 
 // Web-only, and purely additive on top of TouchInputLayer's own always-on drag input — never
 // disables it, same "scheme only ever ADDS a key mapping, never removes the pointer path" principle
-// Snake's identically-named component documents. A seat left on 'mouse' (the default — see
-// gameSettingsValidation.ts) is simply never read from below.
+// Snake's identically-named component documents. A seat left on 'mouse' (the default, see
+// redux/settingsSlice.ts) is simply never read from below.
 //
 // Structurally different from Snake's/LightCycles' own KeyboardInputLayer despite the shared name:
 // those resolve one keydown into one DISCRETE turn; a mallet instead needs CONTINUOUS motion for as

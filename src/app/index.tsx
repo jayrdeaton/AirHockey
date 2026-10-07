@@ -9,11 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { HeroTitle } from '@/components/HeroTitle'
 import { SettingsDialog } from '@/components/SettingsDialog'
-import { useGameSettings } from '@/hooks/useGameSettings'
+import { useSettings } from '@/hooks/useSettings'
 import { GameMode } from '@/types'
 
 export default function HomeScreen() {
-  const { settings, setSettings } = useGameSettings()
+  const { settings, setSettings } = useSettings()
   // No P1/P2 concept on this screen at all, but the rotation angle itself still needs the real
   // p1OnRight reading (which direction the device was actually turned) to pick the correct sign —
   // see @tastic/core's FakeLandscapeView/getViewRotation. Lock Orientation needs nothing here: it

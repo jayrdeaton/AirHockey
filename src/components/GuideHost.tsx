@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import { GUIDE_VERSION } from '@/constants/guide'
 import { getGuideSteps } from '@/constants/guideSteps'
-import { useGameSettings } from '@/hooks/useGameSettings'
+import { useSettings } from '@/hooks/useSettings'
 import { guideActions, selectGuideVersionSeen } from '@/redux/guideSlice'
 import type { RootState } from '@/redux/store'
 
@@ -26,7 +26,7 @@ interface Props {
 // tilt-driven re-render here never re-renders the screen stack under it (same isolation _layout's
 // OrientationBridge relies on).
 export function GuideHost({ children }: Props) {
-  const { settings } = useGameSettings()
+  const { settings } = useSettings()
   const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
   const rotation = getViewRotation(orientationMode, p1OnRight, upsideDown)
   const touch = useIsTouchPrimaryDevice()

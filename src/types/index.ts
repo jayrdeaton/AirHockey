@@ -46,7 +46,7 @@ export type PaddleSizeLevel = 'small' | 'medium' | 'large'
 // any behavior today.
 export type MapMode = 'rink'
 
-export interface GameSettings {
+export interface Settings {
   gameMode: GameMode
   scoreToWin: number
   aiDifficulty: AiDifficulty
@@ -57,7 +57,7 @@ export interface GameSettings {
   lockOrientation: boolean
   // The angle the lock is holding. Written by OrientationProvider's onLockChange (recorded on lock,
   // cleared on unlock) and handed back as lockInitialValue, so a relaunch reopens in the locked
-  // orientation instead of portrait. Never set by the UI directly; see isValidLockedRotation.
+  // orientation instead of portrait. Never set by the UI directly; absent while unlocked.
   lockedRotation?: ViewRotation
   mapMode: MapMode
   friction: FrictionLevel
@@ -66,7 +66,7 @@ export interface GameSettings {
   // iOS-only. Off by default — deliberately opt-in rather than always-on, so it only kicks in for
   // someone who's actually hit the problem and gone looking for a fix, instead of every player
   // eating a "swipe twice to go home" surprise from day one. Mirrored into native UserDefaults (see
-  // useGameSettings.tsx) for @tastic/edge-guard's own config plugin swizzle to read at runtime.
+  // Providers.tsx's EdgeGuardBridge) for @tastic/edge-guard's own config plugin swizzle to read at runtime.
   deferBottomEdgeGestures: boolean
   // Web-only per-seat picker (see PlayerSetupPanel's ControlSchemePicker usage) — which physical
   // input drives each seat's paddle. 'mouse' (the default) keeps using TouchInputLayer's own drag

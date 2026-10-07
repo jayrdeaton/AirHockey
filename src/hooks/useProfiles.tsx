@@ -34,7 +34,7 @@ interface Props {
 }
 
 // Single source of truth for saved player profiles, mounted once in _layout.tsx — same
-// single-Provider rationale as useGameSettings.tsx (expo-router keeps prior screens mounted, so a
+// single-Provider rationale as useGameStats.tsx (expo-router keeps prior screens mounted, so a
 // per-screen copy could go stale or clobber a concurrent update).
 //
 // `profiles` itself now lives in Redux (redux/store.ts's `profiles` key, @tastic/profile's own

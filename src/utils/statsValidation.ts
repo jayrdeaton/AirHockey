@@ -4,7 +4,7 @@ import { AiDifficulty, GoalTotals, MatchRecord, ProfileStats, StatsState, TwoPla
 
 // Kept out of hooks/useGameStats.tsx so it's testable without dragging in
 // @react-native-async-storage/async-storage, which throws at import time under Jest's plain Node
-// environment — mirrors gameSettingsValidation.ts.
+// environment.
 
 // A zeroed vsCpu bucket: an empty win/loss/draw record, an empty per-difficulty breakdown, and a
 // zeroed win streak. Built from @tastic/achievements' own defaults rather than restating the

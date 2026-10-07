@@ -2,8 +2,8 @@ import { DirectionKeysHint, type SeatDevice, SeatDevicesHint, SwipeHint } from '
 
 import { GuideScoreArcs } from '@/components/GuideArt'
 import { effectiveSchemes, getGuideSteps } from '@/constants/guideSteps'
+import { DEFAULT_SETTINGS } from '@/redux/settingsSlice'
 import type { ControlScheme, Player } from '@/types'
-import { DEFAULT_SETTINGS } from '@/utils/gameSettingsValidation'
 
 const DEFAULT_SCHEMES = DEFAULT_SETTINGS.controlScheme
 const ALL_SCHEMES: ControlScheme[] = ['mouse', 'wasd', 'arrows', 'ijkl', 'numpad']

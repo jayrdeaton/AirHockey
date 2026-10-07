@@ -9,8 +9,10 @@ import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, R
 import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR } from '@/constants/game'
 
 import guide, { LEGACY_STORAGE_KEYS } from './guideSlice'
+import liveplay from './liveplaySlice'
 import profileSelection from './profileSelectionSlice'
 import seatColors from './seatColorsSlice'
+import settings from './settingsSlice'
 
 const hasError = (action: unknown): action is { error?: unknown } => typeof action === 'object' && action !== null && 'error' in action && Boolean(action.error)
 
@@ -50,10 +52,13 @@ const rootReducer = combineReducers({
   profileSelection,
   seatColors,
   // Which version of the how-to-play flow this player has finished or skipped, as its own key rather
-  // than a GameSettings field, so it survives 'Reset stats'/'Reset match settings' and never touches
-  // gameSettingsValidation's strict isValidSettings. No whitelist/blacklist below, so it persists
-  // like every other key here. See guideSlice.ts's own doc.
-  guide
+  // than a Settings field, so it survives 'Reset stats'/'Reset match settings'. Persists like every
+  // other key here. See guideSlice.ts's own doc.
+  guide,
+  // The persisted settings (see settingsSlice.ts).
+  settings,
+  // Transient per-round state, the one key blacklisted from persistence below (see liveplaySlice.ts).
+  liveplay
 })
 
 const persistConfig = {
@@ -68,6 +73,8 @@ const persistConfig = {
   // setTimeout call entirely) is redux-persist's own documented way to opt out; AsyncStorage reads
   // failing to ever resolve at all isn't a failure mode worth a 5s failsafe for.
   timeout: 0,
+  // liveplay is per-round state that must never survive a relaunch (see liveplaySlice.ts).
+  blacklist: ['liveplay'],
   // Grandfathers players updating from the shipped pre-redux build (a545f43): they have no 'root'
   // store yet, but do have that build's own AsyncStorage keys, so they rehydrate as existing players
   // and the guide doesn't auto-show for them. A no-op once 'root' exists. See guideSlice.ts.
