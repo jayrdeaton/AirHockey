@@ -16,8 +16,9 @@ export default function HomeScreen() {
   const { settings, setSettings } = useGameSettings()
   // No P1/P2 concept on this screen at all, but the rotation angle itself still needs the real
   // p1OnRight reading (which direction the device was actually turned) to pick the correct sign —
-  // see @tastic/core's FakeLandscapeView/getViewRotation.
-  const { orientationMode, p1OnRight, upsideDown } = useOrientationState(settings.lockOrientation)
+  // see @tastic/core's FakeLandscapeView/getViewRotation. Lock Orientation needs nothing here: it
+  // freezes the shared reading itself (see OrientationBridge in _layout.tsx).
+  const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   // First launch only (and once per session): opens the how-to-play cards over this screen. Called

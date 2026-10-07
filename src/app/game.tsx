@@ -62,7 +62,9 @@ export default function GameScreen() {
   // settings/setSettings (the persisted "next round" defaults, not this round's own locked-in
   // activeRoundSettings above) are only needed to hand off to SettingsDialog below — its Lock
   // Orientation/Edge Guard toggles edit the persisted defaults, not this already-underway round's
-  // own snapshot.
+  // own snapshot. Lock Orientation still applies to this round at once: _layout.tsx's
+  // OrientationBridge feeds the persisted value to the shared orientation reading the board reads
+  // below, so the round's own copy of that setting is never consulted.
   const { activeRoundSettings, settings, setSettings, setIsActivelyPlaying } = useGameSettings()
   const { recordMatchOutcome } = useGameStats()
   const { profiles, lastSelected } = useProfiles()
@@ -80,10 +82,12 @@ export default function GameScreen() {
   const humanPlayers = humanPlayersFor(roundSettings.gameMode)
 
   // Unlike BoxHockey (always pinned portrait, since its board is always vertical), AirHockey's
-  // board adapts to either orientation (see GoalAxis's own doc comment in types/index.ts) — so
-  // this only pins the reading at all when the player has explicitly opted in via
-  // GameSettings.lockOrientation, freezing whichever orientation happens to be live at that moment.
-  const { orientationMode, p1OnRight } = useOrientationState(roundSettings.lockOrientation)
+  // board adapts to either orientation (see GoalAxis's own doc comment in types/index.ts), so the
+  // goal axis and touch mapping follow the shared reading. Lock Orientation freezes that reading
+  // app-wide (see OrientationBridge in _layout.tsx), the board included: while it's on, tilting the
+  // phone never flips the goal axis, and toggling it from this screen's own Settings dialog takes
+  // effect immediately rather than waiting for the next round.
+  const { orientationMode, p1OnRight } = useOrientationState()
   const goalAxis: GoalAxis = orientationMode === 'sideBySide' ? 'horizontal' : 'vertical'
 
   const { width, height } = useWindowDimensions()

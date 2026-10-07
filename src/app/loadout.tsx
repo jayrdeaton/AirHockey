@@ -100,8 +100,9 @@ export default function LoadoutScreen() {
   // not a stored per-round choice. This is what lets two players sit shoulder-to-shoulder and pick
   // a color at the same time once the phone is turned sideways, instead of a portrait-narrow
   // column — and for vs-CPU, it's simply whichever way the solo player is holding it. Lock
-  // Orientation (see SettingsDialog) is the opt-in for pinning it.
-  const { orientationMode, p1OnRight, upsideDown, resolved: p1OnRightResolved } = useOrientationState(settings.lockOrientation)
+  // Orientation (see SettingsDialog) is the opt-in for pinning it, app-wide: it freezes the shared
+  // reading itself (see OrientationBridge in _layout.tsx), so nothing is passed here.
+  const { orientationMode, p1OnRight, upsideDown, resolved: p1OnRightResolved } = useOrientationState()
 
   // The panel area's own layout (which branch renders, which side each panel is on) lags one fade
   // behind the live orientationMode/p1OnRight/upsideDown above — see useDualZoneLayout's own

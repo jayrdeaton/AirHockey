@@ -23,8 +23,15 @@ function isValidControlScheme(value: unknown): value is ControlScheme {
   return value === 'mouse' || value === 'wasd' || value === 'arrows' || value === 'ijkl' || value === 'numpad'
 }
 
+// lockedRotation is optional and absent from DEFAULT_SETTINGS: it only exists while Lock Orientation
+// is on, and settings saved before it existed don't have it either. It must pass when missing, because
+// a failed isValidSettings makes createGameSettingsProvider discard EVERY saved setting, not just this.
+function isValidLockedRotation(value: unknown): value is GameSettings['lockedRotation'] {
+  return value === undefined || value === 0 || value === 90 || value === 180 || value === -90
+}
+
 export function isValidSettings(value: unknown): value is GameSettings {
   if (!value || typeof value !== 'object') return false
   const v = value as Partial<GameSettings>
-  return (v.gameMode === 'twoPlayer' || v.gameMode === 'vsCpu') && typeof v.scoreToWin === 'number' && (v.aiDifficulty === 'easy' || v.aiDifficulty === 'medium' || v.aiDifficulty === 'hard') && typeof v.lockOrientation === 'boolean' && v.mapMode === 'rink' && (v.friction === 'low' || v.friction === 'medium' || v.friction === 'high') && (v.puckSize === 'small' || v.puckSize === 'medium' || v.puckSize === 'large') && (v.paddleSize === 'small' || v.paddleSize === 'medium' || v.paddleSize === 'large') && typeof v.deferBottomEdgeGestures === 'boolean' && !!v.controlScheme && isValidControlScheme(v.controlScheme[1]) && isValidControlScheme(v.controlScheme[2])
+  return (v.gameMode === 'twoPlayer' || v.gameMode === 'vsCpu') && typeof v.scoreToWin === 'number' && (v.aiDifficulty === 'easy' || v.aiDifficulty === 'medium' || v.aiDifficulty === 'hard') && typeof v.lockOrientation === 'boolean' && isValidLockedRotation(v.lockedRotation) && v.mapMode === 'rink' && (v.friction === 'low' || v.friction === 'medium' || v.friction === 'high') && (v.puckSize === 'small' || v.puckSize === 'medium' || v.puckSize === 'large') && (v.paddleSize === 'small' || v.paddleSize === 'medium' || v.paddleSize === 'large') && typeof v.deferBottomEdgeGestures === 'boolean' && !!v.controlScheme && isValidControlScheme(v.controlScheme[1]) && isValidControlScheme(v.controlScheme[2])
 }

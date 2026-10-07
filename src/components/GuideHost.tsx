@@ -19,15 +19,15 @@ interface Props {
 // and useAutoShowGuide() (Home) without prop-drilling.
 //
 // Reads the rotation exactly the way Home (index.tsx) computes the one it hands its SettingsDialog
-// (getViewRotation over useOrientationState(settings.lockOrientation)), so the guide's card, which
-// only ever auto-shows over Home, sits at exactly the angle that dialog does. Its Portal renders
-// outside any FakeLandscapeView, so unlike on-screen content it can't inherit that rotation and has
-// to be handed it. `children` is the stable element _layout passes in, so a tilt-driven re-render
-// here never re-renders the screen stack under it (same isolation _layout's
-// ConnectedRotationAwareStatusBar relies on).
+// (getViewRotation over useOrientationState(), which Lock Orientation freezes app-wide), so the
+// guide's card, which only ever auto-shows over Home, sits at exactly the angle that dialog does.
+// Its Portal renders outside any FakeLandscapeView, so unlike on-screen content it can't inherit
+// that rotation and has to be handed it. `children` is the stable element _layout passes in, so a
+// tilt-driven re-render here never re-renders the screen stack under it (same isolation _layout's
+// OrientationBridge relies on).
 export function GuideHost({ children }: Props) {
   const { settings } = useGameSettings()
-  const { orientationMode, p1OnRight, upsideDown } = useOrientationState(settings.lockOrientation)
+  const { orientationMode, p1OnRight, upsideDown } = useOrientationState()
   const rotation = getViewRotation(orientationMode, p1OnRight, upsideDown)
   const touch = useIsTouchPrimaryDevice()
   const seenVersion = useSelector((state: RootState) => selectGuideVersionSeen(state))
