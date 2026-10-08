@@ -8,6 +8,7 @@ import { FLUSH, PAUSE, PERSIST, persistReducer, persistStore, PURGE, REGISTER, R
 
 import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR } from '@/constants/game'
 
+import achievements from './achievementsSlice'
 import guide, { LEGACY_STORAGE_KEYS } from './guideSlice'
 import liveplay from './liveplaySlice'
 import profileSelection from './profileSelectionSlice'
@@ -40,6 +41,8 @@ const themeReducer = createThemeReducer({
 })
 
 const rootReducer = combineReducers({
+  // Stats and unlocked achievements (see achievementsSlice.ts).
+  achievements,
   theme: themeReducer,
   haptic: hapticReducer,
   sound: appSoundReducer,

@@ -53,7 +53,7 @@ export default function AchievementsScreen() {
   // this fix before AirHockey's copy did).
   const rotation = useRotation()
   const insets = rotateInsets(useSafeAreaInsets(), rotation)
-  const { stats, unlockedAchievements, loaded, resetAll } = useGameStats()
+  const { stats, unlockedAchievements, resetAll } = useGameStats()
   const { profiles } = useProfiles()
   const profilePickerHost = usePopoverHost()
   const fg = dark ? '#FFFFFF' : '#000000'
@@ -71,23 +71,6 @@ export default function AchievementsScreen() {
   const overall = useMemo(() => getOverallTotals(statsView), [statsView])
   const rankings = useMemo(() => getProfileRankings(profiles, stats.profiles), [profiles, stats.profiles])
   const goalDiff = statsView.goals.scored - statsView.goals.conceded
-
-  // useGameStats() starts from DEFAULT_STATS/an empty unlock map before the real AsyncStorage read
-  // resolves (see useAchievements' own `loaded` doc). Without this guard this screen would flash
-  // "0 games played" / every achievement locked for a beat on every visit, not just first launch —
-  // expo-router remounts this screen fresh each time it's navigated to. Screen-local only: this
-  // isn't a splash gate, since achievements is reached by navigation, not the first screen (see
-  // useGameStats.tsx's own `loaded` doc). onReset is omitted here too — nothing worth resetting
-  // has rendered yet.
-  if (!loaded) {
-    return (
-      <FakeLandscapeView style={styles.rotatable}>
-        <BaseStatsScreen onBack={safeBack} insets={insets} rotation={rotation}>
-          <Text style={{ color: fgMuted, fontFamily: MONO_FONT }}>Loading…</Text>
-        </BaseStatsScreen>
-      </FakeLandscapeView>
-    )
-  }
 
   return (
     <FakeLandscapeView style={styles.rotatable}>
