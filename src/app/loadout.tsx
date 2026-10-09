@@ -1,6 +1,7 @@
 import { defaultColors, getThirdColor, useAutoPaperTheme, useThemeSettings } from '@rific/auto-paper'
 import { FakeLandscapeView, getViewRotation, rotateInsets, useOrientationState } from '@tastic/core'
 import { ControlSchemePicker, CornerActionButtons, getColorPopoverId, getCpuDifficultyPopoverId, getInlineColorPickerContentSize, getLabeledDropdownContentHeight, LABELED_DROPDOWN_POPOVER_WIDTH, MenuOption, PlayerSetupPanel, PressAwayOverlay, ReadyButton, SharedActionBand, usePopoverHost, useZoneClampedAlign } from '@tastic/hud'
+import { assignSeatScheme } from '@tastic/input'
 import { Profile } from '@tastic/profile'
 import { DualZoneLayout, needsSharedNeutralZone, useDualZoneLayout } from '@tastic/split-screen'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -450,7 +451,7 @@ export default function LoadoutScreen() {
   // ControlSchemePicker itself gates out to null on native/touch-primary (see that component's own
   // doc) — rendered unconditionally into secondPicker below rather than this screen re-deriving that
   // same Platform/touch check, same as the old local PlayerSetupPanel used to do internally.
-  const p1ControlSchemePicker = <ControlSchemePicker id='p1-controls' host={controlsHost} value={settings.controlScheme[1]} onChange={(scheme) => setSettings({ controlScheme: { ...settings.controlScheme, 1: scheme } })} options={CONTROL_SCHEME_OPTIONS} takenValue={p2IsHuman ? settings.controlScheme[2] : undefined} accentColor={p1Color} mutedColor={fgMuted} dark={dark} />
+  const p1ControlSchemePicker = <ControlSchemePicker id='p1-controls' host={controlsHost} value={settings.controlScheme[1]} onChange={(scheme) => setSettings({ controlScheme: assignSeatScheme(settings.controlScheme, 1, scheme) })} options={CONTROL_SCHEME_OPTIONS} takenValue={p2IsHuman ? settings.controlScheme[2] : undefined} accentColor={p1Color} mutedColor={fgMuted} dark={dark} />
   // Unlike cpuDifficultyAlignOverride below (only meaningful for vsCpu's CPU seat), every seat here
   // always has a color picker — p1Panel and p2Panel both pass swatches={defaultColors}, so their
   // pickers share one content size, computed once. Both overrides are wired in unconditionally, not
@@ -460,7 +461,7 @@ export default function LoadoutScreen() {
   const p1ColorAlignOverride = useZoneClampedAlign(controlsHost.openId === getColorPopoverId('p1'), colorContentSize.width, colorContentSize.height)
   const p2ColorAlignOverride = useZoneClampedAlign(p2Host.openId === getColorPopoverId('p2'), colorContentSize.width, colorContentSize.height)
   const p1Panel = <PlayerSetupPanel idPrefix='p1' host={controlsHost} color={p1Color} onColorChange={handleP1ColorChange} swatches={defaultColors} takenColor={p2Color} allowSwapTaken={gameMode === 'vsCpu'} isHuman secondPicker={p1ControlSchemePicker} secondPickerId='p1-controls' colorAlignOverride={p1ColorAlignOverride} ready={ready[1]} onToggleReady={() => setReady((r) => ({ ...r, 1: !r[1] }))} dark={dark} showReadyButton={showReadyButton} profiles={profiles} selectedProfileId={lastSelected[1]} takenProfileId={p2IsHuman ? lastSelected[2] : null} guestLabel='P1' onProfileSelect={handleP1ProfileSelect} onManageProfiles={() => router.push('/profiles')} />
-  const p2ControlSchemePicker = p2IsHuman ? <ControlSchemePicker id='p2-controls' host={p2Host} value={settings.controlScheme[2]} onChange={(scheme) => setSettings({ controlScheme: { ...settings.controlScheme, 2: scheme } })} options={CONTROL_SCHEME_OPTIONS} takenValue={settings.controlScheme[1]} accentColor={p2Color} mutedColor={fgMuted} dark={dark} /> : undefined
+  const p2ControlSchemePicker = p2IsHuman ? <ControlSchemePicker id='p2-controls' host={p2Host} value={settings.controlScheme[2]} onChange={(scheme) => setSettings({ controlScheme: assignSeatScheme(settings.controlScheme, 2, scheme) })} options={CONTROL_SCHEME_OPTIONS} takenValue={settings.controlScheme[1]} accentColor={p2Color} mutedColor={fgMuted} dark={dark} /> : undefined
   // @tastic/hud@0.9.0 added cpuDifficultyAlignOverride so a caller can hand PlayerSetupPanel's own
   // internal CPU-difficulty LabeledDropdown a zone-aware placement instead of just the plain
   // screen-edge one it computes on its own — but that's only a real fix where the picker actually

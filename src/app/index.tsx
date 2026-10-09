@@ -48,10 +48,10 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
-      {/* Reads correctly no matter which way the phone is actually being held — see
-      @tastic/core's FakeLandscapeView. SettingsDialog stays outside it (a centered
-      Portal-rendered modal isn't affected by a local transform on an ancestor) but still gets the
-      same live `rotation` passed directly, rotating its own content in place instead. */}
+      {/* Everything below reads correctly no matter which way the phone is actually being held:
+      see @tastic/core's FakeLandscapeView. SettingsDialog stays outside it: it renders through a
+      Portal over the whole screen, and BaseSettingsDialog lays itself out in its own frame turned
+      by the `rotation` passed below (see @tastic/hud's RotatedFrame). */}
       <FakeLandscapeView orientationMode={orientationMode} p1OnRight={p1OnRight} upsideDown={upsideDown} style={styles.rotatable}>
         {/* Same top-left slot every @tastic title screen uses for this — see LightCycles' own
         identical trophy IconButton. */}

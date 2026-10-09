@@ -69,6 +69,8 @@ export function ProfilesProvider({ children }: Props) {
     resolveInitialProfiles(SHARED_GROUP_ID, profiles).then((resolved) => {
       if (cancelled) return
       dispatch(profilesActions.setAll(resolved))
+      // A seat can still point at a profile a sibling app deleted since this device last ran.
+      dispatch(profileSelectionActions.pruneToRoster(resolved.map((p) => p.id)))
       setLoaded(true)
     })
     return () => {
@@ -82,7 +84,14 @@ export function ProfilesProvider({ children }: Props) {
   // (onRemoteChange) — see @tastic/profile's own doc for both.
   const { syncToShared } = useSharedProfilesSync({
     groupId: SHARED_GROUP_ID,
-    onRemoteChange: useCallback((remote: Profile[]) => dispatch(profilesActions.setAll(remote)), [dispatch])
+    onRemoteChange: useCallback(
+      (remote: Profile[]) => {
+        dispatch(profilesActions.setAll(remote))
+        // Same job as deleteProfile's clearProfile below, for profiles a sibling app deleted while this one was backgrounded.
+        dispatch(profileSelectionActions.pruneToRoster(remote.map((p) => p.id)))
+      },
+      [dispatch]
+    )
   })
 
   const createProfile = useCallback(

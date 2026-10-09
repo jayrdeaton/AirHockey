@@ -2,7 +2,7 @@ import { useAutoPaperTheme } from '@rific/auto-paper'
 import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
-import { rotateInsets, useOrientationState } from '@tastic/core'
+import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
 import { AchievementUnlockList, type AchievementUnlockOwner, ConfirmDialog, useQuitConfirmation } from '@tastic/hud'
 import { Profile } from '@tastic/profile'
 import { StatusBar } from 'expo-status-bar'
@@ -152,7 +152,11 @@ export default function GameScreen() {
   // render, same as a hand-rolled onBackPress body always did before this hook existed.
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => scores[0] > 0 || scores[1] > 0, safeBack)
-  const paused = settingsOpen || confirmVisible
+  // Leaving the app mid-match (home, app switch, a phone call, Control Center) latches a pause that
+  // only the Paused dialog's Resume clears - see @tastic/core's useBackgroundPause. Skipped once the
+  // match is over, or while a dialog already holds the pause by itself.
+  const { backgroundPaused, resume } = useBackgroundPause(() => phase !== 'gameOver' && !settingsOpen && !confirmVisible)
+  const paused = settingsOpen || confirmVisible || backgroundPaused
 
   // Two-player (pass-and-play) only — seat -> that seat's own newly-unlocked achievements this
   // match, read by the two-player Game Over overlay below to badge each seat correctly (see the
@@ -290,6 +294,13 @@ export default function GameScreen() {
   const settingsPos = localToScreen(board.x + board.width - buttonMargin, board.y + buttonMargin, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
   const rotationStyle = rotationDeg !== 0 ? { transform: [{ rotate: `${rotationDeg}deg` }] } : undefined
 
+  const progressMessage = (
+    <>
+      <Text style={{ color: playerColor[1] }}>{scores[0]}</Text>
+      <Text style={{ color: fgMuted }}> – </Text>
+      <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
+    </>
+  )
   return (
     <View style={[styles.root, { backgroundColor: bg }]}>
       <StatusBar hidden />
@@ -362,24 +373,10 @@ export default function GameScreen() {
       board/other floating UI use (see rotationDeg's own comment above), not a fresh computation.
       Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
       shared component's primary accent and default font — an accepted trade-off. */}
-      <ConfirmDialog
-        visible={confirmVisible}
-        title='Quit Match?'
-        message={
-          <>
-            <Text style={{ color: playerColor[1] }}>{scores[0]}</Text>
-            <Text style={{ color: fgMuted }}> – </Text>
-            <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
-          </>
-        }
-        confirmLabel='Quit'
-        cancelLabel='Cancel'
-        icon='alert-circle-outline'
-        destructive={false}
-        onConfirm={safeBack}
-        onCancel={cancelBack}
-        rotation={rotationDeg}
-      />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} rotation={rotationDeg} />
+      {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
+      play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={rotationDeg} />
 
       {/* Back + settings — anchored to the board's own top corners in LOCAL space (board.x/y), then
           mapped to a real screen position via localToScreen using the SAME rotationDeg the board's

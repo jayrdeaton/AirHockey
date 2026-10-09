@@ -168,6 +168,59 @@ describe('stepPhysics — rink pocket door', () => {
     const result = stepPhysics(puck, rinkBoard, 1, 0.5)
     expect(result.vx).toBeLessThan(3)
   })
+
+  // Regression: with a pocket, the true outer boundary (outerTop/outerBottom) is solid across the
+  // full width, goal mouth and post strips included. Behind-the-line pucks skip friction, so one
+  // that got past this wall would never slow down or come back. Containment only: with no sideways
+  // speed this puck slows to a stop in the pocket, and useGameState's TICK re-serves it (tested in
+  // useGameState.test.ts).
+  const outerTop = rinkBoard.y - rinkBoard.behindGoalDepth
+  const outerBottom = rinkBoard.y + rinkBoard.height + rinkBoard.behindGoalDepth
+
+  it.each([
+    ['top', board.y - r - 1, 5],
+    ['bottom', board.y + board.height + r + 1, -5]
+  ])('keeps a puck that bounced off the %s door inside the pocket on every following step', (_side, y, vy) => {
+    let puck = { x: cx, y, vx: 0, vy }
+    for (let i = 0; i < 300; i++) {
+      const result = stepPhysics(puck, rinkBoard)
+      expect(result.scored).toBeNull()
+      expect(result.y - r).toBeGreaterThanOrEqual(outerTop - 0.001)
+      expect(result.y + r).toBeLessThanOrEqual(outerBottom + 0.001)
+      puck = { x: result.x, y: result.y, vx: result.vx, vy: result.vy }
+    }
+  })
+
+  it('keeps every angled shot inside the rink, including shots that pass beside a goalpost into the pocket', () => {
+    const postRadius = r * 0.18
+    const postedRinkBoard: BoardLayout = {
+      ...rinkBoard,
+      goalPosts: [
+        { x: board.x + board.goalStart, y: board.y, radius: postRadius, player: 2 },
+        { x: board.x + board.goalEnd, y: board.y, radius: postRadius, player: 2 },
+        { x: board.x + board.goalStart, y: board.y + board.height, radius: postRadius, player: 1 },
+        { x: board.x + board.goalEnd, y: board.y + board.height, radius: postRadius, player: 1 }
+      ]
+    }
+    let escaped = 0
+    for (let x = board.x + r; x <= board.x + board.width - r; x += 2) {
+      for (const vx of [-4, -2, 0, 2, 4]) {
+        for (const vy of [-9, 9]) {
+          let puck = { x, y: vy < 0 ? board.y + board.height * 0.2 : board.y + board.height * 0.8, vx, vy }
+          for (let i = 0; i < 300; i++) {
+            const result = stepPhysics(puck, postedRinkBoard)
+            if (result.scored !== null) break
+            if (result.y - r < outerTop - 0.001 || result.y + r > outerBottom + 0.001) {
+              escaped++
+              break
+            }
+            puck = { x: result.x, y: result.y, vx: result.vx, vy: result.vy }
+          }
+        }
+      }
+    }
+    expect(escaped).toBe(0)
+  })
 })
 
 describe('applyPaddleCollision', () => {

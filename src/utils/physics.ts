@@ -40,11 +40,12 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
   // corner instead of crossing through the goal mouth (see boardCornerQuadrant below) — off to the
   // side of centerInGoalX entirely, where neither the score check nor the one-way door ever apply.
   // No paddle can ever follow it back there (clampToOwnHalf never lets one past board.y/board.y+
-  // board.height), so friction decaying it to a stop would strand it permanently, with nothing left
-  // to ever move it again. Staying frictionless instead guarantees it always has enough energy to
-  // keep riding the corner's curve back out the way it came in — this never lets an actual score
-  // linger, since a legitimately scoring puck is already frozen by useGameState's own goalScored
-  // transition before its very next tick would even reach here.
+  // board.height), so friction decaying it to a stop would strand it, with nothing left to ever
+  // move it again. Staying frictionless instead keeps it moving until it rides the corner's curve
+  // back out the way it came in. Bounces back there still cost WALL_RESTITUTION, though, so one
+  // that does come to rest behind the line is re-served by useGameState's TICK. This never lets an
+  // actual score linger, since a legitimately scoring puck is already frozen by useGameState's own
+  // goalScored transition before its very next tick would even reach here.
   const behindGoalLine = wasBehindTop || wasBehindBottom
 
   if (!midCrossing && !behindGoalLine) {
@@ -108,29 +109,32 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
       }
     }
 
-    // The TRUE outer boundary — board.y/board.height extended by board.behindGoalDepth. The gap
-    // in this flat wall is governed by centerInGoalX (the same center-only threshold the score
-    // check and the goalpost check above use): the posts are what actually make a wide-angle
-    // approach to the goal mouth feel fair, so this flat wall only needs to get out of their way
-    // once the puck's own center has genuinely entered the true goal opening, not before. The
-    // wall stays solid across the FULL width outside the corners, including at the goal mouth
-    // itself — the goal is a SLOT (a scoring position, not a wall opening), met only by the
-    // posts/score-check, not by an actual gap in this boundary.
+    // The TRUE outer boundary: board.y/board.height extended by board.behindGoalDepth. Whenever
+    // there's a pocket behind the goal line (always, on a real AirHockey board), skipGoalGap makes
+    // this wall solid across the FULL width outside the corners, goal mouth and post strips
+    // included: the goal is a SLOT (a scoring position, not a wall opening), so a puck sails past
+    // board.y there and meets this wall further back instead of leaving the rink. Pucks behind the
+    // line skip friction (see behindGoalLine above), so a gap here would let one escape for good.
+    // Only a pocketless board (behindGoalDepth 0, the bare test fixture) opens this wall, at the
+    // goal mouth (centerInGoalX, the same center-only threshold the score check and the goalpost
+    // check above use) and beside each post (nearPostX below), so clearing the line scores there.
+    const skipGoalGap = board.behindGoalDepth > 0
     const outerTop = board.y - board.behindGoalDepth
     const outerBottom = board.y + board.height + board.behindGoalDepth
-    // Widens the near-line wall's own permeable zone in X to also exclude any post's real reach:
-    // the post's max reach in x is puckRadius + postRadius, but only at the post's own y —
-    // everywhere else its reach shrinks (a circle), while the wall's reach stays a constant
+    // Widens the pocketless near-line wall's own permeable zone in X to also exclude any post's
+    // real reach: the post's max reach in x is puckRadius + postRadius, but only at the post's own
+    // y; everywhere else its reach shrinks (a circle), while the wall's reach stays a constant
     // puckRadius regardless of x, so without this the wall can fire first at some x-offsets
-    // instead of the post's own round shape.
-    const nearPostX = board.goalPosts.some((post) => Math.abs(x - post.x) < r + post.radius)
-    if (!postHit && y - r < outerTop && !centerInGoalX && !nearPostX) {
+    // instead of the post's own round shape. Off whenever skipGoalGap is on: that wall sits well
+    // behind every post, and a pure-x gap there is exactly the hole a puck used to escape through.
+    const nearPostX = !skipGoalGap && board.goalPosts.some((post) => Math.abs(x - post.x) < r + post.radius)
+    if (!postHit && y - r < outerTop && (skipGoalGap || (!centerInGoalX && !nearPostX))) {
       y = outerTop + r
       vy = Math.abs(vy) * WALL_RESTITUTION
       bounced = true
     }
 
-    if (!postHit && y + r > outerBottom && !centerInGoalX && !nearPostX) {
+    if (!postHit && y + r > outerBottom && (skipGoalGap || (!centerInGoalX && !nearPostX))) {
       y = outerBottom - r
       vy = -Math.abs(vy) * WALL_RESTITUTION
       bounced = true

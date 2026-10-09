@@ -2,7 +2,7 @@ import { useGameLoop } from '@tastic/core'
 import { useCallback, useEffect, useReducer, useRef } from 'react'
 
 import { GOAL_SERVE_PAUSE_MS, PADDLE_VELOCITY_SMOOTHING_FRAMES } from '@/constants/game'
-import { BoardLayout, GameState, PaddleState, Player, PuckState } from '@/types'
+import { BoardLayout, GameState, GoalSide, PaddleState, Player, PuckState } from '@/types'
 import { centerPaddle, centerPuck, clampToOwnHalf, faceoffZoneCenter } from '@/utils/board'
 import { applyPaddleCollision, clampPaddleSpeed, computePaddleVelocity, stepPhysics } from '@/utils/physics'
 
@@ -42,8 +42,17 @@ function makeInitialState(board: BoardLayout): GameState {
     lastScoredGoal: null,
     bounceCount: 0,
     goalDoorHitCount: 0,
-    lastGoalDoorSide: null
+    lastGoalDoorSide: null,
+    pocketDoorHit: null
   }
+}
+
+// The pocket the puck sits fully inside (entirely past that goal line), or null. No paddle can
+// ever reach it there: clampToOwnHalf stops every paddle at the line.
+function pocketSide(puck: PuckState, board: BoardLayout): GoalSide | null {
+  if (puck.y + board.puckRadius < board.y) return 'top'
+  if (puck.y - board.puckRadius > board.y + board.height) return 'bottom'
+  return null
 }
 
 // Commits one player's paddle from its raw target position into a real, velocity-bearing
@@ -62,9 +71,10 @@ function commitPaddle(prev: PaddleState, target: { x: number; y: number }, dt: n
 export function makeReducer(scoreToWin: number, friction: number) {
   return function reducer(state: GameState, action: Action): GameState {
     switch (action.type) {
-      // idle -> live: the pre-game "get ready" beat, same pause GOAL_SERVE gives after a goal
-      // (see useGameState's own effect below) — puck/paddles are already sitting at center/home
-      // from makeInitialState, so this only has to flip the phase, no repositioning needed.
+      // idle -> live: the "get ready" beat, same pause GOAL_SERVE gives after a goal (see
+      // useGameState's own effect below). The puck is already on its spot (center from
+      // makeInitialState, or a faceoff zone after TICK re-served a stranded puck), so this only has
+      // to flip the phase, no repositioning needed.
       case 'START':
         if (state.phase !== 'idle') return state
         return { ...state, phase: 'live' }
@@ -82,6 +92,14 @@ export function makeReducer(scoreToWin: number, friction: number) {
         puck = applyPaddleCollision(puck, state.paddles[2], paddles[2], action.board.puckRadius, action.board.paddleRadius)
         const result = stepPhysics(puck, action.board, action.dt, friction)
 
+        // A puck rattling between a pocket's back wall and its one-way door hits the door again on
+        // every lap: only the first hit of each pocket visit counts (the stat and Board's flash).
+        const pocket = pocketSide(result, action.board)
+        const goalDoorHit = result.goalDoorHit !== state.pocketDoorHit ? result.goalDoorHit : null
+        const goalDoorHitCount = goalDoorHit ? state.goalDoorHitCount + 1 : state.goalDoorHitCount
+        const lastGoalDoorSide = goalDoorHit ?? state.lastGoalDoorSide
+        const pocketDoorHit = pocket === null ? null : (goalDoorHit ?? state.pocketDoorHit)
+
         if (result.scored !== null) {
           const scores: [number, number] = [state.scores[0], state.scores[1]]
           scores[result.scored - 1]++
@@ -90,28 +108,30 @@ export function makeReducer(scoreToWin: number, friction: number) {
           // playerGoalSide in utils/board.ts and stepPhysics' own scored:1/2 convention), so the
           // celebration's physical side is the inverse of the scoring player number.
           const lastScoredGoal = result.scored === 1 ? 'top' : 'bottom'
-          const goalDoorHitCount = result.goalDoorHit ? state.goalDoorHitCount + 1 : state.goalDoorHitCount
-          const lastGoalDoorSide = result.goalDoorHit ?? state.lastGoalDoorSide
           if (scores[result.scored - 1] >= scoreToWin) {
-            return { ...state, phase: 'gameOver', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide }
+            return { ...state, phase: 'gameOver', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
           }
-          return { ...state, phase: 'goalScored', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide }
+          return { ...state, phase: 'goalScored', scores, puck: nextPuck, paddles, lastScoredGoal, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
         }
+
+        const bounceCount = result.bounced ? state.bounceCount + 1 : state.bounceCount
 
         // Unlike BoxHockey, a stopped puck does not end anything here — there is no turn to pass.
         // It simply sits there, mid-rally, until a paddle touches it again, same as a real table.
-        // A puck stuck behind a goal line specifically (reachable via a rounded-corner wraparound
-        // that bypasses scoring — see boardCornerQuadrant in physics.ts) can never come to rest at
-        // all: stepPhysicsOnce exempts it from friction back there for exactly that reason, so
-        // there's no separate recovery to do here.
-        return {
-          ...state,
-          puck: result,
-          paddles,
-          bounceCount: result.bounced ? state.bounceCount + 1 : state.bounceCount,
-          goalDoorHitCount: result.goalDoorHit ? state.goalDoorHitCount + 1 : state.goalDoorHitCount,
-          lastGoalDoorSide: result.goalDoorHit ?? state.lastGoalDoorSide
+        // Except behind a goal line, where no paddle can follow it. Pucks back there skip friction
+        // (see stepPhysicsOnce), but every bounce between the one-way door and the pocket's back
+        // wall still costs WALL_RESTITUTION, so one with little sideways speed slows to a stop
+        // without ever getting out. Re-serve it, with no goal, from the nearer faceoff zone in that
+        // end (the top pocket sits behind player 2's goal, the same mapping GOAL_SERVE uses for the
+        // scored-on player), after the usual 'idle' serve beat.
+        if (result.stopped && pocket !== null) {
+          const owner: Player = pocket === 'top' ? 2 : 1
+          const goalCX = action.board.x + (action.board.goalStart + action.board.goalEnd) / 2
+          const puckPos = faceoffZoneCenter(action.board, owner, result.x < goalCX ? 0 : 1)
+          return { ...state, phase: 'idle', puck: { ...puckPos, vx: 0, vy: 0 }, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit: null }
         }
+
+        return { ...state, puck: result, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit }
       }
 
       // Post-goal re-serve — see useGameState's own GOAL_SERVE_PAUSE_MS timer. Unlike BoxHockey

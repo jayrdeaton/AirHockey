@@ -1,6 +1,7 @@
+import { STOP_THRESHOLD } from '@/constants/game'
 import { makeReducer } from '@/hooks/useGameState'
 import { GameState } from '@/types'
-import { computeBoardLayout, faceoffZoneCenter } from '@/utils/board'
+import { centerPaddle, computeBoardLayout, faceoffZoneCenter } from '@/utils/board'
 
 const insets = { top: 0, bottom: 0, left: 0, right: 0 }
 const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium')
@@ -9,7 +10,7 @@ function idleState(): GameState {
   return makeReducer(5, 0.986)(
     // Seed via RESET so the fixture always matches makeInitialState's own shape, rather than
     // hand-duplicating it here and risking drift.
-    { phase: 'idle', scores: [0, 0], puck: { x: 0, y: 0, vx: 0, vy: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredGoal: null, bounceCount: 0, goalDoorHitCount: 0, lastGoalDoorSide: null },
+    { phase: 'idle', scores: [0, 0], puck: { x: 0, y: 0, vx: 0, vy: 0 }, paddles: { 1: { x: 0, y: 0, vx: 0, vy: 0 }, 2: { x: 0, y: 0, vx: 0, vy: 0 } }, lastScoredGoal: null, bounceCount: 0, goalDoorHitCount: 0, lastGoalDoorSide: null, pocketDoorHit: null },
     { type: 'RESET', board }
   )
 }
@@ -149,5 +150,54 @@ describe('RESCALE', () => {
     expect(Number.isNaN(next.puck.y)).toBe(false)
     expect(next.puck.x).toBeCloseTo(board.centerX, 5)
     expect(next.puck.y).toBeCloseTo(board.centerY, 5)
+  })
+})
+
+describe('stranded puck re-serve', () => {
+  const r = board.puckRadius
+  const goalCX = board.x + (board.goalStart + board.goalEnd) / 2
+  const homeTargets = { 1: centerPaddle(board, 1), 2: centerPaddle(board, 2) }
+
+  // Regression: behind-the-line pucks skip friction, but each bounce between the one-way door and
+  // the pocket's back wall still costs WALL_RESTITUTION, so a puck with no sideways speed slows to
+  // a stop there, out of every paddle's reach. A goal never happens, so nothing used to serve again.
+  it.each([
+    ['top', goalCX - 5, board.y - r - 1, 5, 2, 0],
+    ['bottom', goalCX + 5, board.y + board.height + r + 1, -5, 1, 1]
+  ] as const)('re-serves a puck that comes to rest in the %s pocket at the near faceoff zone in that end, with no goal and one door hit', (_side, x, y, vy, owner, zoneIndex) => {
+    const reducer = makeReducer(5, 0.986)
+    let state: GameState = { ...liveState(), puck: { x, y, vx: 0, vy } }
+    let ticks = 0
+    while (state.phase === 'live' && ticks < 5000) {
+      state = reducer(state, { type: 'TICK', board, dt: 1, targets: homeTargets })
+      ticks++
+      const { puck } = state
+      const atRest = Math.abs(puck.vx) < STOP_THRESHOLD && Math.abs(puck.vy) < STOP_THRESHOLD
+      const behindLine = puck.y + r < board.y || puck.y - r > board.y + board.height
+      expect(atRest && behindLine).toBe(false)
+    }
+    const expected = faceoffZoneCenter(board, owner, zoneIndex)
+    expect(state.phase).toBe('idle')
+    expect(state.puck).toEqual({ x: expected.x, y: expected.y, vx: 0, vy: 0 })
+    expect(state.scores).toEqual([0, 0])
+    expect(state.lastScoredGoal).toBeNull()
+    expect(state.goalDoorHitCount).toBe(1)
+    expect(state.pocketDoorHit).toBeNull()
+
+    // The usual serve beat (useGameState's GOAL_SERVE_PAUSE_MS timer) then puts it back in play.
+    const started = reducer(state, { type: 'START' })
+    expect(started.phase).toBe('live')
+    expect(started.puck).toEqual(state.puck)
+  })
+
+  it('counts the door again on a later pocket visit', () => {
+    const reducer = makeReducer(5, 0.986)
+    const inPlay = reducer({ ...liveState(), pocketDoorHit: 'top' }, { type: 'TICK', board, dt: 1, targets: homeTargets })
+    expect(inPlay.pocketDoorHit).toBeNull()
+
+    const doorHit = reducer({ ...inPlay, puck: { x: goalCX, y: board.y - r - 1, vx: 0, vy: 5 } }, { type: 'TICK', board, dt: 1, targets: homeTargets })
+    expect(doorHit.goalDoorHitCount).toBe(inPlay.goalDoorHitCount + 1)
+    expect(doorHit.lastGoalDoorSide).toBe('top')
+    expect(doorHit.pocketDoorHit).toBe('top')
   })
 })

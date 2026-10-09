@@ -13,7 +13,9 @@ export type ControlScheme = KeyScheme | 'mouse'
 
 // Dramatically simpler than BoxHockey's turn/faceoff/coinFlip machine — the puck and both
 // paddles are always live simultaneously ('live'), a goal pauses briefly for a re-serve
-// ('goalScored') then returns to 'live', with no possession/turn concept at all.
+// ('goalScored') then returns to 'live', with no possession/turn concept at all. 'idle' is the
+// serve beat with the puck already on its spot: before the opening serve, and after a puck that
+// came to rest behind a goal line is re-served (see useGameState's TICK).
 export type GamePhase = 'idle' | 'live' | 'goalScored' | 'gameOver'
 
 export type GameMode = 'twoPlayer' | 'vsCpu'
@@ -175,6 +177,10 @@ export interface GameState {
   // a ref rather than expecting a return to 0.
   goalDoorHitCount: number
   lastGoalDoorSide: GoalSide | null
+  // The pocket whose door the puck has already hit since it last went fully behind that goal line,
+  // or null. A puck rattling between the door and the pocket's back wall hits the door on every lap,
+  // and only the first hit of each visit counts toward goalDoorHitCount (see useGameState's TICK).
+  pocketDoorHit: GoalSide | null
 }
 
 // ─── Stats & achievements ───────────────────────────────────────────────────

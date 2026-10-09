@@ -1,7 +1,7 @@
 import { DirectionKeysHint, type SeatDevice, SeatDevicesHint, SwipeHint } from '@tastic/hud/guide'
 
 import { GuideScoreArcs } from '@/components/GuideArt'
-import { effectiveSchemes, getGuideSteps } from '@/constants/guideSteps'
+import { getGuideSteps } from '@/constants/guideSteps'
 import { DEFAULT_SETTINGS } from '@/redux/settingsSlice'
 import type { ControlScheme, Player } from '@/types'
 
@@ -113,7 +113,7 @@ describe('getGuideSteps', () => {
     for (const p1 of ALL_SCHEMES) {
       for (const p2 of ALL_SCHEMES) {
         const [, , card] = steps(false, { 1: p1, 2: p2 })
-        const seats = effectiveSchemes({ 1: p1, 2: p2 })
+        const seats: Record<Player, ControlScheme> = { 1: p1, 2: p2 }
         const anyMouse = seats[1] === 'mouse' || seats[2] === 'mouse'
         const bothMouse = seats[1] === 'mouse' && seats[2] === 'mouse'
         const tail = anyMouse ? ' Drag in your own half.' : ' Change them before a match.'
@@ -124,15 +124,5 @@ describe('getGuideSteps', () => {
         expect(card.art).toMatchObject({ type: SeatDevicesHint, props: { devices: [DEVICE[seats[1]], DEVICE[seats[2]]] } })
       }
     }
-  })
-
-  it('never names keys player 2 cannot use: a shared key scheme goes to player 1, leaving player 2 the mouse', () => {
-    expect(effectiveSchemes({ 1: 'wasd', 2: 'wasd' })).toEqual({ 1: 'wasd', 2: 'mouse' })
-    expect(effectiveSchemes({ 1: 'mouse', 2: 'mouse' })).toEqual({ 1: 'mouse', 2: 'mouse' })
-
-    const [, , shared] = steps(false, { 1: 'wasd', 2: 'wasd' })
-    expect(shared.body).toBe('Player 1 uses WASD, player 2 uses the mouse. Drag in your own half.')
-    expect(shared.title).toBe('Two Players, One Computer')
-    expect(shared.art).toMatchObject({ props: { devices: ['keyboard', 'mouse'] } })
   })
 })

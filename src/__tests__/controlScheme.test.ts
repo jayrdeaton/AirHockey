@@ -1,3 +1,7 @@
+import { assignSeatScheme } from '@tastic/input'
+
+import { DEFAULT_SETTINGS } from '@/redux/settingsSlice'
+import type { ControlScheme } from '@/types'
 import { resolveControlSchemeDirection } from '@/utils/controlScheme'
 
 describe('resolveControlSchemeDirection', () => {
@@ -26,5 +30,29 @@ describe('resolveControlSchemeDirection', () => {
 
   it('returns null for a key not in the given scheme', () => {
     expect(resolveControlSchemeDirection({ key: 'q', code: 'KeyQ' }, 'wasd')).toBeNull()
+  })
+})
+
+// The loadout's two pickers write through assignSeatScheme (see loadout.tsx).
+describe('loadout control scheme picks', () => {
+  const ALL_SCHEMES: ControlScheme[] = ['mouse', 'wasd', 'arrows', 'ijkl', 'numpad']
+
+  // Regression: a 1 Player pick of seat 2's scheme left both seats on it, and KeyboardInputLayer
+  // then sent every one of those keys to seat 1 in a later 2 Player game.
+  it("hands seat 2 seat 1's old scheme when seat 1 picks seat 2's", () => {
+    expect(assignSeatScheme(DEFAULT_SETTINGS.controlScheme, 1, 'wasd')).toEqual({ 1: 'wasd', 2: 'mouse' })
+  })
+
+  it('never leaves both seats on one scheme, from any setup a pick can reach', () => {
+    const setups = ALL_SCHEMES.flatMap((p1) => ALL_SCHEMES.filter((p2) => p2 !== p1).map((p2) => ({ 1: p1, 2: p2 })))
+    for (const current of setups) {
+      for (const seat of [1, 2] as const) {
+        for (const scheme of ALL_SCHEMES) {
+          const next = assignSeatScheme(current, seat, scheme)
+          expect(next[seat]).toBe(scheme)
+          expect(next[1]).not.toBe(next[2])
+        }
+      }
+    }
   })
 })

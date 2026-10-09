@@ -28,15 +28,6 @@ interface GuideStepsInput {
   scoreToWin: number
 }
 
-// What each seat actually plays with. KeyboardInputLayer hands every keypress to the FIRST human seat
-// whose scheme claims it, so two seats left on the same key scheme (reachable: player 1's picker has
-// no taken value in vs-CPU) leave player 2's keys dead. Player 2 still has the mouse, since
-// TouchInputLayer's pointer input is always on. Naming the dead keys would be a false sentence.
-export function effectiveSchemes(controlScheme: Record<Player, ControlScheme>): Record<Player, ControlScheme> {
-  const p2Dead = controlScheme[2] !== 'mouse' && controlScheme[2] === controlScheme[1]
-  return { 1: controlScheme[1], 2: p2Dead ? 'mouse' : controlScheme[2] }
-}
-
 function controlsStep(touch: boolean, scheme: ControlScheme): GuideStep {
   const title = 'Move Your Paddle'
   if (touch) return { title, body: 'Your paddle follows your finger. Swipe fast to hit the puck harder.', art: <SwipeHint direction='up' /> }
@@ -59,15 +50,16 @@ function seatDevice(scheme: ControlScheme): SeatDevice {
 // or, keys only, that the schemes can be changed (the loadout's pickers).
 function twoPlayerStep(touch: boolean, controlScheme: Record<Player, ControlScheme>): GuideStep {
   if (touch) return { title: 'Two Players, One Phone', body: 'Sit across from each other and keep your finger in your own half.', art: <SeatDiagram /> }
-  const seats = effectiveSchemes(controlScheme)
-  const anyMouse = seats[1] === 'mouse' || seats[2] === 'mouse'
-  // After effectiveSchemes the two seats only ever match on the mouse.
-  const who = seats[1] === 'mouse' && seats[2] === 'mouse' ? 'Both players use the mouse.' : `Player 1 uses ${SCHEME_PHRASE[seats[1]]}, player 2 uses ${SCHEME_PHRASE[seats[2]]}.`
+  const anyMouse = controlScheme[1] === 'mouse' || controlScheme[2] === 'mouse'
+  // Both seats on the mouse is said once ("Both players use the mouse.") instead of twice. The
+  // loadout's pickers can't produce that pair (assignSeatScheme swaps), so only settings saved
+  // before they did still reach this branch.
+  const who = controlScheme[1] === 'mouse' && controlScheme[2] === 'mouse' ? 'Both players use the mouse.' : `Player 1 uses ${SCHEME_PHRASE[controlScheme[1]]}, player 2 uses ${SCHEME_PHRASE[controlScheme[2]]}.`
   return {
     // "One Keyboard" is only true when neither seat is on the mouse, and by default player 1 is.
     title: anyMouse ? 'Two Players, One Computer' : 'Two Players, One Keyboard',
     body: `${who} ${anyMouse ? 'Drag in your own half.' : 'Change them before a match.'}`,
-    art: <SeatDevicesHint devices={[seatDevice(seats[1]), seatDevice(seats[2])]} />
+    art: <SeatDevicesHint devices={[seatDevice(controlScheme[1]), seatDevice(controlScheme[2])]} />
   }
 }
 
