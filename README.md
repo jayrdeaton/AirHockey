@@ -15,7 +15,7 @@ AirHockey is a real-time air hockey game for iOS, Android, and web. Built with E
 - **Player profiles:** saved names, colors, and tags per seat. On iOS the roster is shared with my other games through an App Group.
 - **Stats and achievements:** per-profile and device-wide records (vs CPU by difficulty, two-player results, goals, shutouts, win and day streaks) and 33 bronze/silver/gold achievements.
 - **How-to-play guide:** a short first-run guide, replayable from Settings, whose copy reflects each seat's live control scheme and the current score to win.
-- **Settings:** sound, haptics, appearance, Lock Orientation, an iOS option to defer system edge gestures during play, and a manual update check. A match pauses automatically when the app goes to the background.
+- **Settings:** sound, haptics, appearance, Lock Orientation, Edge Guard (an iOS option that makes system edge gestures need a second swipe during play), and Check for Updates. A match pauses automatically when the app goes to the background and stays Paused until a player taps Resume.
 
 ## Under the hood
 
@@ -41,12 +41,12 @@ AirHockey is a real-time air hockey game for iOS, Android, and web. Built with E
 | [`@tastic/profile`](https://www.npmjs.com/package/@tastic/profile) | Player profiles, picker, roster screen, shared App Group sync |
 | [`@tastic/achievements`](https://www.npmjs.com/package/@tastic/achievements) | Tiered achievement catalog, streak tracking, Redux-backed persistence |
 | [`@tastic/edge-guard`](https://www.npmjs.com/package/@tastic/edge-guard) | Optional guard against iOS edge system gestures during play |
-| [`@rific/core`](https://www.npmjs.com/package/@rific/core) | Redux settings slice factory |
+| [`@rific/core`](https://www.npmjs.com/package/@rific/core) | Redux settings slice factory, safe back navigation |
 | [`@rific/auto-paper`](https://www.npmjs.com/package/@rific/auto-paper) | React Native Paper theming from seed colors, light/dark appearance |
 | [`@rific/feedback-press`](https://www.npmjs.com/package/@rific/feedback-press) | Buttons with haptic and sound feedback, vibration, game sounds |
 | [`@rific/toaster`](https://www.npmjs.com/package/@rific/toaster) | Toast notifications (achievement unlocks, update errors) |
-| [`@rific/splash-gate`](https://www.npmjs.com/package/@rific/splash-gate) | Keeps the splash screen up until profiles have loaded |
-| [`@rific/updater`](https://www.npmjs.com/package/@rific/updater) | OTA update checks and the build/update scripts |
+| [`@rific/splash-gate`](https://www.npmjs.com/package/@rific/splash-gate) | Keeps the splash screen up until the theme, fonts, and profiles are ready |
+| [`@rific/updater`](https://www.npmjs.com/package/@rific/updater) | OTA update checks and the `build`/`update` scripts |
 | [`@rific/focus-chain`](https://www.npmjs.com/package/@rific/focus-chain) | Peer dependency of `@tastic/profile` for form focus |
 
 ## Getting started
@@ -56,13 +56,15 @@ npm install
 npm run ios        # or: npm run android / npm start (web)
 ```
 
-The app uses native code that Expo Go doesn't include (the `@tastic/core` and `@tastic/edge-guard` config plugins and `@tastic/profile`'s native iOS shared-roster module), so iOS and Android run as a development build (`expo-dev-client`). `npm run ios` and `npm run android` build it locally. `npm install` also runs `setup-skia-web`, which sets up CanvasKit for the web target.
+The app uses native code that Expo Go doesn't include (the `@tastic/core` and `@tastic/edge-guard` config plugins and `@tastic/profile`'s native iOS shared-roster module), so iOS and Android run as a development build (`expo-dev-client`). `npm run ios` and `npm run android` build it locally (`expo run:*`), and `npm run client` starts the dev server for an already-installed build. `npm install` also runs `setup-skia-web` (the `postinstall` script), which copies Skia's CanvasKit WASM into `public/` for the web target.
 
 ### Checks
 
 ```bash
 npm run verify     # lint (expo lint) + Jest + typecheck (tsc)
 ```
+
+CI runs the same command on pushes and pull requests to `main`, and `npm run build` / `npm run update` (via `@rific/updater`) run it before building or publishing.
 
 ## Project layout
 
