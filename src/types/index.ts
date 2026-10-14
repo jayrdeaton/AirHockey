@@ -39,15 +39,6 @@ export type PuckSizeLevel = 'small' | 'medium' | 'large'
 // is a real gameplay knob, not just cosmetic.
 export type PaddleSizeLevel = 'small' | 'medium' | 'large'
 
-// Per-round table layout - stubbed with a single value for now, the way BoxHockey's own
-// BoardVariant presumably started before gauntlet/gravity existed. AirHockey's board is currently
-// always rink-shaped (see BoardLayout's own cornerRadius/behindGoalDepth, both unconditional in
-// computeBoardLayout), so 'rink' just names the one layout that already exists - this gives it a
-// real settings slot/UI entry (see LoadoutSharedControls' own 'mapMode' trigger, matching
-// BoxHockey's 'boardVariant' pattern one-for-one) ready for more values later, without switching
-// any behavior today.
-export type MapMode = 'rink'
-
 export interface Settings {
   gameMode: GameMode
   scoreToWin: number
@@ -61,7 +52,14 @@ export interface Settings {
   // cleared on unlock) and handed back as lockInitialValue, so a relaunch reopens in the locked
   // orientation instead of portrait. Never set by the UI directly; absent while unlocked.
   lockedRotation?: ViewRotation
-  mapMode: MapMode
+  // Same toggle as BoxHockey's Settings.rink, and the same geometry (see computeBoardLayout in
+  // utils/board.ts, which takes it as its own `rink` parameter). On: rounded outer corners and a
+  // real pocket behind each goal to skate around in (plus the one-way door guarding it), reaching
+  // into the safe-area insets so the goal lines stay at the safe-area edge. Neither the corners nor
+  // the pocket's boundary are drawn; the puck can just go there, all the way to the device's own
+  // physical edge. Off: square corners and a permeable goal line at the safe-area edge, with no
+  // depth behind it. On by default.
+  rink: boolean
   friction: FrictionLevel
   puckSize: PuckSizeLevel
   paddleSize: PaddleSizeLevel
@@ -136,7 +134,8 @@ export interface BoardLayout {
   // field/type stays rather than deleting a working, well-tested code path.
   obstacles: Obstacle[]
   goalPosts: GoalPost[]
-  cornerRadius: number // rounded-corner radius at the 4 outer boundary corners - always on (unconditional, real air-hockey table geometry)
+  // Both 0 unless Settings.rink is on - see computeBoardLayout in utils/board.ts.
+  cornerRadius: number // rounded-corner radius at the 4 outer boundary corners
   behindGoalDepth: number // how far the true collision boundary extends past the goal line, behind each goal
 }
 

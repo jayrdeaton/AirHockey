@@ -11,7 +11,7 @@ export interface TouchInputLayerProps {
   humanPlayers: Player[]
   enabled: boolean
   // Local-space container size (see GoalSide's own doc comment in types/index.ts) - the SAME
-  // local viewport BoardHost renders into, sized via computeLocalContainerSize in utils/board.ts.
+  // full-screen local viewport BoardHost renders into, sized via computeLocalContainerSize in utils/board.ts.
   localWidth: number
   localHeight: number
   // The local container's own screen-space center (game.tsx's outer viewport is centered around

@@ -41,8 +41,8 @@ describe('goal width always leaves GOAL_OPEN_FRACTION of open net around a cente
 
 describe('rotating the device (swapping which real dimension is short/long) produces geometrically equivalent local geometry', () => {
   it.each(sizes)('vertical(W,H) and horizontal(H,W) agree on every geometry field, at puckSize=%s', (size) => {
-    const vertical = computeBoardLayout(400, 900, insets, 'vertical', size)
-    const horizontal = computeBoardLayout(900, 400, insets, 'horizontal', size)
+    const vertical = computeBoardLayout(400, 900, insets, 'vertical', size, 'medium', true)
+    const horizontal = computeBoardLayout(900, 400, insets, 'horizontal', size, 'medium', true)
     expect(horizontal.x).toBeCloseTo(vertical.x, 5)
     expect(horizontal.y).toBeCloseTo(vertical.y, 5)
     expect(horizontal.width).toBeCloseTo(vertical.width, 5)
@@ -86,17 +86,48 @@ describe('goalPosts', () => {
   })
 })
 
-describe('rink geometry (rounded corners + goal pocket) is unconditional', () => {
-  it.each(sizes)('cornerRadius and behindGoalDepth are both > 0 at puckSize=%s, and the extended boundary stays within the viewport', (size) => {
-    const board = computeBoardLayout(400, 900, insets, 'vertical', size)
+describe('rink geometry (Settings.rink)', () => {
+  it.each(sizes)('rink on: cornerRadius and behindGoalDepth are both > 0 at puckSize=%s, and the extended boundary stays within the screen', (size) => {
+    const board = computeBoardLayout(400, 900, insets, 'vertical', size, 'medium', true)
     expect(board.cornerRadius).toBeGreaterThan(0)
     expect(board.behindGoalDepth).toBeGreaterThan(0)
     expect(board.y - board.behindGoalDepth).toBeGreaterThanOrEqual(0)
     expect(board.y + board.height + board.behindGoalDepth).toBeLessThanOrEqual(900)
   })
 
+  it.each(sizes)('rink off: square corners, no pocket, and the goal lines sit at the safe-area edges at puckSize=%s', (size) => {
+    const notched = { top: 59, bottom: 34, left: 0, right: 0 }
+    const board = computeBoardLayout(400, 900, notched, 'vertical', size, 'medium', false)
+    expect(board.cornerRadius).toBe(0)
+    expect(board.behindGoalDepth).toBe(0)
+    expect(board.y).toBeCloseTo(notched.top, 5)
+    expect(board.y + board.height).toBeCloseTo(900 - notched.bottom, 5)
+  })
+
+  // Same as BoxHockey's rink: the pocket borrows the otherwise-empty safe-area space instead of
+  // pushing the goal lines forward, reaching the physical screen edge at both ends.
+  it('rink on: the pocket reaches into the safe-area insets, all the way to both screen edges', () => {
+    // Both insets deeper than the pocket's own puck-clearance minimum (68 at this size), so the
+    // larger one alone sets the depth.
+    const notched = { top: 80, bottom: 50, left: 0, right: 0 }
+    const board = computeBoardLayout(400, 900, notched, 'vertical', 'medium', 'medium', true)
+    expect(board.behindGoalDepth).toBeCloseTo(notched.top, 5)
+    // The larger inset's goal line stays exactly at its safe-area edge.
+    expect(board.y).toBeCloseTo(notched.top, 5)
+    expect(board.y - board.behindGoalDepth).toBeCloseTo(0, 5)
+    expect(board.y + board.height + board.behindGoalDepth).toBeCloseTo(900, 5)
+  })
+
+  it('rink on with equal insets: both goal lines stay exactly at their safe-area edges', () => {
+    const even = { top: 80, bottom: 80, left: 0, right: 0 }
+    const off = computeBoardLayout(400, 900, even, 'vertical', 'medium', 'medium', false)
+    const on = computeBoardLayout(400, 900, even, 'vertical', 'medium', 'medium', true)
+    expect(on.y).toBeCloseTo(off.y, 5)
+    expect(on.height).toBeCloseTo(off.height, 5)
+  })
+
   it('a puck sailing wide of the goal (not banked into a corner) can reach the pocket', () => {
-    const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium')
+    const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium', 'medium', true)
     let puck = { x: board.x + board.width * 0.25, y: board.y + board.height * 0.15, vx: 0, vy: -6 }
     let reachedPocket = false
     for (let i = 0; i < 300; i++) {
@@ -108,8 +139,20 @@ describe('rink geometry (rounded corners + goal pocket) is unconditional', () =>
     expect(reachedPocket).toBe(true)
   })
 
-  it('a dead-center shot at the goal still scores normally', () => {
-    const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium')
+  it('rink off: a puck sailing wide of the goal stays in front of the goal line', () => {
+    const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium', 'medium', false)
+    // Halfway between the side wall and the goal mouth, clear of the posts.
+    let puck = { x: board.x + board.goalStart / 2, y: board.y + board.height * 0.15, vx: 0, vy: -6 }
+    for (let i = 0; i < 300; i++) {
+      const result = stepPhysics(puck, board, 1)
+      puck = { x: result.x, y: result.y, vx: result.vx, vy: result.vy }
+      expect(puck.y - board.puckRadius).toBeGreaterThanOrEqual(board.y - 0.001)
+      if (result.scored !== null || result.stopped) break
+    }
+  })
+
+  it.each([true, false])('a dead-center shot at the goal still scores normally (rink %s)', (rink) => {
+    const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium', 'medium', rink)
     const scored = simulateToRest({ x: board.centerX, y: board.y + board.height * 0.75, vx: 0, vy: 22 }, board)
     expect(scored).toBe(2)
   })
@@ -162,17 +205,15 @@ describe('desktop web letterboxing', () => {
     // how the result's own width/height are labeled.
     //
     // Only approximate, not exact: TABLE_LONG_TO_SHORT_RATIO governs the OUTER letterboxed
-    // container, but board.height is the inner PLAYING FIELD, already shrunk by the (always-on)
-    // goal pocket depth at each end - same "field is inner, container is outer" distinction
-    // BoxHockey's own board.ts uses. A narrower letterboxed S makes that pocket a proportionally
-    // bigger bite out of L, so the field's own ratio drifts further from 2:1 than the outer
-    // container did - real, expected, and already true of BoxHockey's identical formula whenever
-    // its own (opt-in) rink pocket is combined with desktop letterboxing.
+    // container, but board.height is the inner PLAYING FIELD, shrunk by the rink's goal pocket
+    // depth at each end - same "field is inner, container is outer" distinction BoxHockey's own
+    // board.ts uses. A narrower letterboxed S makes that pocket a proportionally bigger bite out of
+    // L, so the field's own ratio drifts further from 2:1 than the outer container did.
     require('react-native').Platform.OS = 'web'
     const axes: GoalAxis[] = ['vertical', 'horizontal']
     for (const axis of axes) {
-      const unclamped = computeBoardLayout(2000, 1900, insets, axis, 'medium') // both dims generous, so neither is the tight constraint
-      const clampedByWidth = computeBoardLayout(1600, 1000, insets, axis, 'medium') // long dimension is the tight constraint here
+      const unclamped = computeBoardLayout(2000, 1900, insets, axis, 'medium', 'medium', true) // both dims generous, so neither is the tight constraint
+      const clampedByWidth = computeBoardLayout(1600, 1000, insets, axis, 'medium', 'medium', true) // long dimension is the tight constraint here
       // Letterboxing actually engaged: the clamped board is narrower/shorter than one with no
       // tight constraint on either dimension.
       expect(clampedByWidth.width).toBeLessThan(unclamped.width)

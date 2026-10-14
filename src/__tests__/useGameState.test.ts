@@ -4,7 +4,7 @@ import { GameState } from '@/types'
 import { centerPaddle, computeBoardLayout, faceoffZoneCenter } from '@/utils/board'
 
 const insets = { top: 0, bottom: 0, left: 0, right: 0 }
-const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium')
+const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium', 'medium', true)
 
 function idleState(): GameState {
   return makeReducer(5, 0.986)(
@@ -131,7 +131,7 @@ describe('RESCALE', () => {
   it('remaps the puck/paddles by their fractional position within the board, preserving phase and scores', () => {
     const reducer = makeReducer(5, 0.986)
     const state = { ...liveState(), scores: [2, 1] as [number, number] }
-    const doubled = computeBoardLayout(800, 1800, insets, 'vertical', 'medium')
+    const doubled = computeBoardLayout(800, 1800, insets, 'vertical', 'medium', 'medium', true)
     const next = reducer(state, { type: 'RESCALE', prevBoard: board, board: doubled })
     expect(next.phase).toBe('live')
     expect(next.scores).toEqual([2, 1])
@@ -144,7 +144,7 @@ describe('RESCALE', () => {
   it('falls back to dead center (rather than NaN) when rescaling from a degenerate zero-sized board', () => {
     const reducer = makeReducer(5, 0.986)
     const state = liveState()
-    const zeroBoard = computeBoardLayout(0, 0, insets, 'vertical', 'medium')
+    const zeroBoard = computeBoardLayout(0, 0, insets, 'vertical', 'medium', 'medium', true)
     const next = reducer(state, { type: 'RESCALE', prevBoard: zeroBoard, board })
     expect(Number.isNaN(next.puck.x)).toBe(false)
     expect(Number.isNaN(next.puck.y)).toBe(false)

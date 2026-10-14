@@ -11,6 +11,11 @@ import { BoardLayout, GamePhase, GoalSide, PaddleStates, Player, PuckState } fro
 import { faceoffZoneCenters, faceoffZoneRadius } from '@/utils/board'
 import { computeGoalWedges } from '@/utils/goalWedges'
 
+// Flip to true locally to see the rink's true collision curve (corners + behind-goal pocket) while
+// tuning cornerRadius/behindGoalDepth in computeBoardLayout - off by default, same as BoxHockey's,
+// since normal play deliberately draws nothing back there (see rinkPerimeterPath's own comment).
+const SHOW_RINK_DEBUG_PERIMETER = false
+
 export interface BoardProps {
   board: BoardLayout
   puck: PuckState
@@ -25,9 +30,9 @@ export interface BoardProps {
   // than expecting a return to 0.
   goalDoorHitCount: number
   lastGoalDoorSide: GoalSide | null
-  // Perimeter walls (all four sides) - see game.tsx's isDesktopWeb. On a phone (native or mobile
-  // web) they'd sit redundantly right against the device's own physical edge, which already reads
-  // as the boundary; only desktop web, with no such edge, gets them.
+  // Perimeter walls (all four sides, rink off only) - see game.tsx's isDesktopWeb. On a phone
+  // (native or mobile web) they'd sit redundantly right against the device's own physical edge,
+  // which already reads as the boundary; only desktop web, with no such edge, gets them.
   showWalls: boolean
 }
 
@@ -97,15 +102,13 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
   const p2WedgeAngles = useMemo(() => computeGoalWedges(scoreToWin, 0), [scoreToWin])
 
   // ─── Rink pocket perimeter (curved caps behind each goal) ──────────────────
-  // Ported from BoxHockey's opt-in 'rink' case, now the only geometry there is (see
-  // computeBoardLayout - cornerRadius/behindGoalDepth are unconditional). Unlike BoxHockey (where
-  // this same curve is a debug-only aid, hidden by default since its rink is an opt-in toggle most
-  // rounds never use - the "safe area" behind the goal simply isn't reachable to begin with when
-  // rink is off there), AirHockey's pocket is a permanent, unconditional part of every board, so a
-  // player can always drift or get knocked back there - the curve marking where it actually
-  // bounces is real, load-bearing information every round, not a tuning aid, so it's drawn always
-  // (see the render usage below) rather than gated behind a debug flag.
+  // Ported from BoxHockey unchanged: two open arc-line-arc caps built off the TRUE outer boundary
+  // (extended by behindGoalDepth), null when Settings.rink is off. Never drawn in normal play - the
+  // pocket reads best with nothing drawn there at all, the puck just going all the way to the
+  // device's own physical edge - so it's kept only for SHOW_RINK_DEBUG_PERIMETER, and as the
+  // "rink is on" signal the desktop perimeter walls below key off.
   const rinkPerimeterPath = useMemo(() => {
+    if (board.cornerRadius <= 0) return null
     const cr = board.cornerRadius
     const outerTop = y - board.behindGoalDepth
     const outerBottom = y + height + board.behindGoalDepth
@@ -180,32 +183,26 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
         <ZoneLine x={x} width={width} y={p1ZoneLineY} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
         <ZoneLine x={x} width={width} y={p2ZoneLineY} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
 
-        {/* Goal lines - BoxHockey only colors these when its opt-in rink pocket is on (plain
-            wallColor otherwise, since a rink-off goal line IS the solid boundary - see its own
-            comment). AirHockey's pocket is unconditional, so this side of that same branch is the
-            only one that ever applies: always colored, because there's always an open pocket
-            behind this line for it to mark, never a solid boundary of its own - see the perimeter
-            walls just below, which follow the OTHER half of that same rink-on/off branch. */}
-        <Line p1={vec(x, y)} p2={vec(goalAbsLeft, y)} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
-        <Line p1={vec(goalAbsRight, y)} p2={vec(x + width, y)} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
-        <Line p1={vec(x, y + height)} p2={vec(goalAbsLeft, y + height)} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
-        <Line p1={vec(goalAbsRight, y + height)} p2={vec(x + width, y + height)} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
+        {/* Goal lines - same as BoxHockey's: each player's own color when Settings.rink is on (a
+            painted line in front of an open pocket), plain wallColor when it's off
+            (board.behindGoalDepth is exactly 0 then), since with no pocket behind it this line IS
+            the solid boundary a puck stops dead at. */}
+        <Line p1={vec(x, y)} p2={vec(goalAbsLeft, y)} color={board.behindGoalDepth === 0 ? wallColor : p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
+        <Line p1={vec(goalAbsRight, y)} p2={vec(x + width, y)} color={board.behindGoalDepth === 0 ? wallColor : p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
+        <Line p1={vec(x, y + height)} p2={vec(goalAbsLeft, y + height)} color={board.behindGoalDepth === 0 ? wallColor : p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
+        <Line p1={vec(goalAbsRight, y + height)} p2={vec(x + width, y + height)} color={board.behindGoalDepth === 0 ? wallColor : p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
 
         {/* Goal door flash - fills in exactly the gap the two goal-line <Line>s above deliberately
             leave open (goalAbsLeft..goalAbsRight). Invisible at rest until a real door hit snaps
-            both layers on - this is the ONLY visual cue that the gap isn't actually open. */}
-        <GoalDoorFlash leftX={goalAbsLeft} rightX={goalAbsRight} topY={y} bottomY={y + height} topColor={p2Color} bottomColor={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} hitCount={goalDoorHitCount} hitSide={lastGoalDoorSide} />
+            both layers on - this is the ONLY visual cue that the gap isn't actually open. Rink only:
+            with no pocket there's no door to hit (gated the same way physics.ts gates it). */}
+        {board.behindGoalDepth > 0 && <GoalDoorFlash leftX={goalAbsLeft} rightX={goalAbsRight} topY={y} bottomY={y + height} topColor={p2Color} bottomColor={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} hitCount={goalDoorHitCount} hitSide={lastGoalDoorSide} />}
 
-        {/* Rink pocket boundary - the curved caps built above, now always drawn (see that
-            comment). Also the only perimeter boundary ever drawn on the table's long sides at all:
-            the `showWalls && !rinkPerimeterPath` Rect fallback just below never fires, the same
-            `showWalls &&` (no rink check) contradiction BoxHockey itself guards against - a solid
-            Rect flanking the goal would draw a non-crossable boundary directly abutting a goal
-            line/post that's marking a crossable one (see the goal lines' own comment just above).
-            Since AirHockey's pocket is unconditional, rinkPerimeterPath is never null, so that
-            fallback is permanently dead - same effective outcome BoxHockey's own rink-on case
-            reaches, structurally identical rather than special-cased away. */}
-        <Path path={rinkPerimeterPath} style='stroke' strokeWidth={wallThickness} strokeCap='round' color={wallColor} />
+        {/* Perimeter walls - desktop web only (see showWalls), and only with Settings.rink off:
+            with the pocket on, a solid wall flanking the goal would mark a non-crossable boundary
+            right against a goal line that's marking a crossable one, so nothing is drawn there,
+            same as BoxHockey. SHOW_RINK_DEBUG_PERIMETER draws the rink's true collision curve. */}
+        {SHOW_RINK_DEBUG_PERIMETER && rinkPerimeterPath && <Path path={rinkPerimeterPath} style='stroke' strokeWidth={wallThickness} strokeCap='round' color={wallColor} />}
         {showWalls && !rinkPerimeterPath && (
           <>
             <ObstacleRect x={x - wallThickness} y={y - wallThickness} width={wallThickness} height={height + wallThickness * 2} color={wallColor} />

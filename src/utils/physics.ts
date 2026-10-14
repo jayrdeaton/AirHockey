@@ -110,12 +110,12 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
     }
 
     // The TRUE outer boundary: board.y/board.height extended by board.behindGoalDepth. Whenever
-    // there's a pocket behind the goal line (always, on a real AirHockey board), skipGoalGap makes
+    // there's a pocket behind the goal line (Settings.rink on), skipGoalGap makes
     // this wall solid across the FULL width outside the corners, goal mouth and post strips
     // included: the goal is a SLOT (a scoring position, not a wall opening), so a puck sails past
     // board.y there and meets this wall further back instead of leaving the rink. Pucks behind the
     // line skip friction (see behindGoalLine above), so a gap here would let one escape for good.
-    // Only a pocketless board (behindGoalDepth 0, the bare test fixture) opens this wall, at the
+    // Only a pocketless board (behindGoalDepth 0, Settings.rink off) opens this wall, at the
     // goal mouth (centerInGoalX, the same center-only threshold the score check and the goalpost
     // check above use) and beside each post (nearPostX below), so clearing the line scores there.
     const skipGoalGap = board.behindGoalDepth > 0

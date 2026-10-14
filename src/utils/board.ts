@@ -25,12 +25,30 @@ export function computeViewportSize(screenWidth: number, screenHeight: number, i
   }
 }
 
-// The short/long extents of the LOCAL board container - S (short axis, where the goal sits) and
-// L (long axis, goal-to-goal) - derived from whichever real screen dimension is currently short
-// vs. long given goalAxis. game.tsx uses this directly to size the View it rotates (see
-// GoalAxis's own doc comment in types/index.ts): the container is always laid out S-wide by
-// L-tall in local terms, then rotated ±90° onto the real screen when goalAxis is 'horizontal'.
-export function computeLocalContainerSize(screenWidth: number, screenHeight: number, insets: EdgeInsets, goalAxis: GoalAxis): { width: number; height: number } {
+// The safe-area insets at each end of the local short (goal-line) and long (goal-to-goal) axes,
+// following the same "which real dimension is short vs. long" split computeViewportSize's callers
+// make from goalAxis below.
+function axisInsets(insets: EdgeInsets, goalAxis: GoalAxis): { shortStart: number; longStart: number; longEnd: number } {
+  return goalAxis === 'vertical' ? { shortStart: insets.left, longStart: insets.top, longEnd: insets.bottom } : { shortStart: insets.top, longStart: insets.left, longEnd: insets.right }
+}
+
+// The LOCAL board container - the whole screen, safe-area insets included, expressed in local
+// terms: S-wide (short axis, where the goal sits) by L-tall (long axis, goal-to-goal), whichever
+// real screen dimension is currently short vs. long given goalAxis. game.tsx uses this directly to
+// size the View it rotates (see GoalAxis's own doc comment in types/index.ts): the container is
+// always laid out S-wide by L-tall in local terms, then rotated ±90° onto the real screen when
+// goalAxis is 'horizontal'. It covers the insets (rather than sitting inside them) so that, with
+// Settings.rink on, the pocket behind each goal can reach into the otherwise-empty status-bar/home-
+// indicator space, same as BoxHockey's own rink; computeBoardLayout keeps the playing field itself
+// clear of them.
+export function computeLocalContainerSize(screenWidth: number, screenHeight: number, goalAxis: GoalAxis): { width: number; height: number } {
+  return goalAxis === 'vertical' ? { width: screenWidth, height: screenHeight } : { width: screenHeight, height: screenWidth }
+}
+
+// The board's own short/long extents (S, L) inside the safe area. Desktop web fixes them to the
+// real-world aspect ratio (TABLE_LONG_TO_SHORT_RATIO) and letterboxes; native and mobile web fill
+// the safe area exactly.
+function computeFieldExtents(screenWidth: number, screenHeight: number, insets: EdgeInsets, goalAxis: GoalAxis): { S: number; L: number; availableShort: number; availableLong: number } {
   const { width: availableWidth, height: availableHeight } = computeViewportSize(screenWidth, screenHeight, insets)
   const availableShort = goalAxis === 'vertical' ? availableWidth : availableHeight
   const availableLong = goalAxis === 'vertical' ? availableHeight : availableWidth
@@ -44,7 +62,7 @@ export function computeLocalContainerSize(screenWidth: number, screenHeight: num
       S = L / TABLE_LONG_TO_SHORT_RATIO
     }
   }
-  return { width: S, height: L }
+  return { S, L, availableShort, availableLong }
 }
 
 // Which local side (always 'bottom' for player 1, 'top' for player 2 - see GoalSide's own doc
@@ -65,18 +83,17 @@ function buildGoalPosts(x: number, y: number, height: number, goalStart: number,
   ]
 }
 
-// Single source of truth for rink geometry, always expressed in the canonical LOCAL space (see
+// Single source of truth for board geometry, always expressed in the canonical LOCAL space (see
 // GoalSide's own doc comment in types/index.ts) - goals on the local top/bottom regardless of the
-// real device orientation. goalAxis is accepted only to decide which real screen dimension is
-// currently "short" vs. "long" (so puck/paddle/goal sizing always derives from the true short
-// edge, whichever real axis that happens to be right now) - it never branches the geometry itself
-// beyond that, unlike BoxHockey's board.ts, which never needed to make that distinction at all
-// since its board is permanently portrait.
-export function computeBoardLayout(screenWidth: number, screenHeight: number, insets: EdgeInsets, goalAxis: GoalAxis, puckSize: PuckSizeLevel = 'medium', paddleSize: PaddleSizeLevel = 'medium'): BoardLayout {
-  const { width: S, height: L } = computeLocalContainerSize(screenWidth, screenHeight, insets, goalAxis)
-  const { width: availableWidth, height: availableHeight } = computeViewportSize(screenWidth, screenHeight, insets)
-  const availableShort = goalAxis === 'vertical' ? availableWidth : availableHeight
-  const availableLong = goalAxis === 'vertical' ? availableHeight : availableWidth
+// real device orientation, in the coordinates of computeLocalContainerSize's full-screen
+// container. goalAxis is accepted only to decide which real screen dimension is currently "short"
+// vs. "long" (so puck/paddle/goal sizing always derives from the true short edge, whichever real
+// axis that happens to be right now) - it never branches the geometry itself beyond that, unlike
+// BoxHockey's board.ts, which never needed to make that distinction at all since its board is
+// permanently portrait.
+export function computeBoardLayout(screenWidth: number, screenHeight: number, insets: EdgeInsets, goalAxis: GoalAxis, puckSize: PuckSizeLevel = 'medium', paddleSize: PaddleSizeLevel = 'medium', rink: boolean = false): BoardLayout {
+  const { S, L, availableShort, availableLong } = computeFieldExtents(screenWidth, screenHeight, insets, goalAxis)
+  const { shortStart, longStart, longEnd } = axisInsets(insets, goalAxis)
 
   const margin = boardMargin(screenWidth)
   const puckRadius = S * PUCK_SIZE_RATIOS[puckSize]
@@ -88,20 +105,32 @@ export function computeBoardLayout(screenWidth: number, screenHeight: number, in
   const goalStart = (S - goalWidth) / 2
   const goalEnd = goalStart + goalWidth
 
-  // Real air-hockey table geometry, unconditional (not an opt-in toggle like BoxHockey's
-  // `rink: boolean`) - rounded outer corners and a real pocket behind each goal the puck can
-  // skate into, so it can never permanently stall in a corner. Same formulas BoxHockey uses for
-  // its opt-in rink-on case, evaluated against the local short axis S.
-  const behindGoalDepth = puckRadius * 2.5 + WALL_THICKNESS
-  const cornerRadius = S * 0.12
+  // Settings.rink only, with BoxHockey's exact formulas: rounded outer corners and a real pocket
+  // behind each goal the puck can skate into (see physics.ts's boardCornerQuadrant/skipGoalGap and
+  // the one-way door). Both 0 when it's off: square corners and a permeable goal line at the
+  // safe-area edge, where a puck whose center clears the posts and the line scores immediately.
+  //
+  // The depth must be >= 2*puckRadius + WALL_THICKNESS so a gradual (not single-frame) score can
+  // fully clear the line before meeting the pocket's back wall; 2.5x leaves real margin. It's also
+  // floored at both long-axis insets so the pocket reaches all the way to the physical screen edge
+  // on both ends (see the borrows below).
+  const behindGoalDepth = rink ? Math.max(puckRadius * 2.5 + WALL_THICKNESS, longStart, longEnd) : 0
+  const cornerRadius = rink ? S * 0.12 : 0
 
-  const outerShortStart = margin + (availableShort - S) / 2
-  const outerLongStart = margin + (availableLong - L) / 2
+  // Rather than shrink the field by the full behindGoalDepth at both ends (which pushes each goal
+  // line forward, away from the screen edge), borrow from the safe-area insets first: that space
+  // is otherwise just empty background. Capped at each inset (can't borrow more than exists there);
+  // whatever's left over still shrinks the field, so this degrades gracefully on devices with
+  // small or no insets. With unequal insets (a notch vs. a home indicator) the smaller end can't
+  // borrow its full share of the shared depth, so that goal line sits slightly in from its edge.
+  const startBorrow = Math.min(behindGoalDepth, longStart)
+  const endBorrow = Math.min(behindGoalDepth, longEnd)
 
-  const x = outerShortStart
-  const y = outerLongStart + behindGoalDepth
+  const x = shortStart + margin + (availableShort - S) / 2
+  const outerTop = longStart + margin + (availableLong - L) / 2 - startBorrow
+  const y = outerTop + behindGoalDepth
   const width = S
-  const height = L - behindGoalDepth * 2
+  const height = L - behindGoalDepth * 2 + startBorrow + endBorrow
 
   const postRadius = puckRadius * 0.18
 

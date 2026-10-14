@@ -19,7 +19,7 @@ import { liveplayActions } from '@/redux/liveplaySlice'
 import { seatColorsActions } from '@/redux/seatColorsSlice'
 import { DEFAULT_SETTINGS } from '@/redux/settingsSlice'
 import type { AppDispatch, RootState } from '@/redux/store'
-import { ControlScheme, FrictionLevel, MapMode, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
+import { ControlScheme, FrictionLevel, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
 import { AIDifficulty } from '@/utils/aiOpponent'
 import { humanPlayersFor, parseGameMode } from '@/utils/gameMode'
 import { safeBack } from '@/utils/navigation'
@@ -29,11 +29,10 @@ import { safeBack } from '@/utils/navigation'
 // instead of adding to it, same 180ms BoxHockey itself uses for this exact fade.
 const PANEL_SWAP_FADE_MS = 180
 
-// Stubbed with a single option (see MapMode's own doc comment) - 'rink' just names the one table
-// layout that already exists (AirHockey's board is unconditionally rink-shaped), giving it a real
-// settings slot ahead of any second map actually existing. Matches BoxHockey's own
-// BOARD_VARIANT_OPTIONS shape (a MenuOption per layout), just with one entry today.
-const MAP_MODE_OPTIONS: MenuOption<MapMode>[] = [{ value: 'rink', label: 'Rink', description: 'Rounded corners + net pocket', icon: 'rounded-corner' }]
+// The rink toggle's single option, same as BoxHockey's RINK_OPTION: presence in a one-item
+// multi-select's value array already means "on," so there's nothing an "off" row would add beyond
+// what tapping the "on" row a second time (to un-toggle it) already does.
+const RINK_OPTION: MenuOption<'on'> = { value: 'on', label: 'Rink', description: 'Rounded corners + net pocket', icon: 'rounded-corner' }
 
 const FRICTION_OPTIONS: MenuOption<FrictionLevel>[] = [
   { value: 'high', label: 'Slow', description: 'Puck stops quickly', icon: 'speedometer-slow' },
@@ -314,7 +313,7 @@ export default function LoadoutScreen() {
   // identically-shaped handlers.
   const handleRandomizeMatchSettings = useCallback(() => {
     setSettings({
-      mapMode: pickRandom(MAP_MODE_OPTIONS),
+      rink: Math.random() < 0.5,
       friction: pickRandom(FRICTION_OPTIONS),
       puckSize: pickRandom(PUCK_SIZE_OPTIONS),
       paddleSize: pickRandom(PADDLE_SIZE_OPTIONS),
@@ -325,7 +324,7 @@ export default function LoadoutScreen() {
 
   const handleResetMatchSettings = useCallback(() => {
     setSettings({
-      mapMode: DEFAULT_SETTINGS.mapMode,
+      rink: DEFAULT_SETTINGS.rink,
       friction: DEFAULT_SETTINGS.friction,
       puckSize: DEFAULT_SETTINGS.puckSize,
       paddleSize: DEFAULT_SETTINGS.paddleSize,
@@ -407,9 +406,9 @@ export default function LoadoutScreen() {
   const sharedControlsRow = (
     <LoadoutSharedControls
       host={controlsHost}
-      mapMode={settings.mapMode}
-      mapModeOptions={MAP_MODE_OPTIONS}
-      onMapModeChange={(value) => setSettings({ mapMode: value })}
+      rink={settings.rink}
+      rinkOption={RINK_OPTION}
+      onRinkChange={(value) => setSettings({ rink: value })}
       friction={settings.friction}
       frictionOptions={FRICTION_OPTIONS}
       onFrictionChange={(value) => setSettings({ friction: value })}

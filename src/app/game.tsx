@@ -79,6 +79,7 @@ export default function GameScreen() {
   const friction = FRICTION_LEVELS[roundSettings.friction]
   const puckSize = roundSettings.puckSize
   const paddleSize = roundSettings.paddleSize
+  const rink = roundSettings.rink
   // Only P2 can be CPU-controlled - pass-and-play stays the default, single-player just swaps who
   // controls P2's paddle (see useAIOpponent, which drives it through the exact same setPaddleTarget
   // path a human's touch uses).
@@ -127,20 +128,18 @@ export default function GameScreen() {
   // board (canonical LOCAL geometry - see GoalSide's doc comment in types/index.ts) and localSize
   // (the container BEFORE the rotation below) are derived from the same S/L split, so they always
   // agree with each other regardless of goalAxis.
-  const board = useMemo(() => computeBoardLayout(logicalWidth, logicalHeight, logicalInsets, goalAxis, puckSize, paddleSize), [logicalWidth, logicalHeight, logicalInsets, goalAxis, puckSize, paddleSize])
-  const localSize = useMemo(() => computeLocalContainerSize(logicalWidth, logicalHeight, logicalInsets, goalAxis), [logicalWidth, logicalHeight, logicalInsets, goalAxis])
-  const outerWidth = width - insets.left - insets.right
-  const outerHeight = height - insets.top - insets.bottom
-  // The local container is flex-centered within the outer viewport (see the `viewport` style
-  // below), so its own screen-space center always coincides with the outer viewport's center -
+  const board = useMemo(() => computeBoardLayout(logicalWidth, logicalHeight, logicalInsets, goalAxis, puckSize, paddleSize, rink), [logicalWidth, logicalHeight, logicalInsets, goalAxis, puckSize, paddleSize, rink])
+  const localSize = useMemo(() => computeLocalContainerSize(logicalWidth, logicalHeight, goalAxis), [logicalWidth, logicalHeight, goalAxis])
+  // The local container is flex-centered within the full-screen viewport (see the `viewport` style
+  // below), so its own screen-space center always coincides with the screen's center -
   // TouchInputLayer needs this (plus the rotation itself) to convert a touch's real screen
   // position back into local board coordinates by hand (see its own screenToLocal comment for
   // why this can't just rely on a zone's own e.x/e.y). Deliberately the RAW (physical, un-swapped)
-  // width/height/insets, unlike the board geometry above - a real touch always arrives in real
-  // physical screen coordinates regardless of the CSS rotation trick, so this has to stay in that
-  // same physical space for TouchInputLayer's own un-rotation math to line up with it.
-  const screenCenterX = insets.left + outerWidth / 2
-  const screenCenterY = insets.top + outerHeight / 2
+  // width/height, unlike the board geometry above - a real touch always arrives in real physical
+  // screen coordinates regardless of the CSS rotation trick, so this has to stay in that same
+  // physical space for TouchInputLayer's own un-rotation math to line up with it.
+  const screenCenterX = width / 2
+  const screenCenterY = height / 2
 
   // Settings/quit-confirm dialogs pause gameplay while open. useQuitConfirmation reads hasProgress
   // lazily (only inside a real requestBack() call, via its own ref-mirrored getter - see that
@@ -258,16 +257,16 @@ export default function GameScreen() {
         // Broadcasting into seatUnlocks instead lets the two-player Game Over overlay below (which
         // already carries the board's own rotationStyle) show each seat's own unlocks once the
         // match settles - same fix Pong's/LightCycles' own game.tsx applies, for the identical
-        // reason. Device-wide achievements have no per-seat owner, but both seats are human here,
-        // so they're broadcast into both seats' own entries rather than dropped or arbitrarily
-        // attributed to one side.
-        const broadcast = broadcastDeviceUnlocks([1, 2] as Player[], result.profiles, result.device)
+        // reason. Each seat also gets the device-wide unlocks that are really its own (all of them
+        // for a guest, only scope: 'device' ones for a profile; see @tastic/achievements'
+        // broadcastDeviceUnlocks).
+        const broadcast = broadcastDeviceUnlocks([1, 2] as Player[], result.profiles, result.device, profileIds)
         // eslint-disable-next-line react-hooks/set-state-in-effect -- a real one-shot transition guarded by prevPhaseRef above, not a render loop; the sibling vsCpu branch below fires showAchievementToast (which does the same thing inside @rific/toaster) unconditionally in this same effect
         setSeatUnlocks(broadcast)
       } else {
         // vsCpu only ever has one human perspective (seat 1) to address - the shared, screen-fixed
         // toast is fine here.
-        ;[...result.device, ...(result.profiles[1] ?? [])].forEach((achievement) => {
+        ;(broadcastDeviceUnlocks([1] as Player[], result.profiles, result.device, profileIds)[1] ?? []).forEach((achievement) => {
           showAchievementToast(achievement.title, 'Achievement unlocked', undefined, { color: ACHIEVEMENT_TIER_COLORS[achievement.tier], icon: achievement.icon })
         })
       }
@@ -290,8 +289,11 @@ export default function GameScreen() {
   // back chip well off-screen once desktop web's letterboxing made S×L diverge from
   // logicalWidth×logicalHeight).
   const buttonMargin = 16
-  const backPos = localToScreen(board.x + buttonMargin, board.y + buttonMargin, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
-  const settingsPos = localToScreen(board.x + board.width - buttonMargin, board.y + buttonMargin, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
+  // With Settings.rink off on a screen with no top inset, the field starts right at the screen's
+  // edge, so the chips (24px half-height) are held 4px clear of it rather than hanging off-screen.
+  const buttonY = Math.max(board.y, 12) + buttonMargin
+  const backPos = localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
+  const settingsPos = localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
   const rotationStyle = rotationDeg !== 0 ? { transform: [{ rotate: `${rotationDeg}deg` }] } : undefined
 
   const progressMessage = (
@@ -305,8 +307,10 @@ export default function GameScreen() {
     <View style={[styles.root, { backgroundColor: bg }]}>
       <StatusBar hidden />
 
-      {/* Local-space board + input area - sized to localSize (the container BEFORE rotation),
-          centered within the real safe-area viewport, then rotated ±90° for side-by-side
+      {/* Local-space board + input area - sized to localSize (the container BEFORE rotation,
+          covering the whole screen so the rink pocket can reach into the safe-area insets; the
+          board geometry keeps the playing field itself inside them), centered on the screen,
+          then rotated ±90° for side-by-side
           landscape so the SAME canonical local geometry (see GoalSide's own doc comment) maps
           onto a wide screen correctly. Board's Skia canvas is written purely in local
           coordinates and never branches on goalAxis at all - DOM/native hit-testing correctly
@@ -321,7 +325,7 @@ export default function GameScreen() {
           clockwise/counter-clockwise expectation didn't match RN-web's actual rotate() sign, so
           this is calibrated against the real render, not re-derived from theory): '90deg' puts
           player 1 (local bottom) on the screen's RIGHT, '-90deg' puts them on the LEFT. */}
-      <View style={[styles.viewport, { top: insets.top, left: insets.left, width: outerWidth, height: outerHeight }]}>
+      <View style={[styles.viewport, { width, height }]}>
         <View style={[styles.localContainer, { width: localSize.width, height: localSize.height }, rotationDeg !== 0 && { transform: [{ rotate: `${rotationDeg}deg` }] }]}>
           <Board board={board} puck={puck} paddles={paddles} phase={phase} scores={scores} scoreToWin={scoreToWin} lastScoredGoal={lastScoredGoal} goalDoorHitCount={goalDoorHitCount} lastGoalDoorSide={lastGoalDoorSide} showWalls={isDesktopWeb} />
           {/* Zones themselves still live inside this same rotated container - DOM/native hit-
@@ -437,5 +441,5 @@ const styles = StyleSheet.create({
   overlayTitle: { fontWeight: 'bold' },
   root: { flex: 1 },
   settingsButton: { position: 'absolute' },
-  viewport: { alignItems: 'center', justifyContent: 'center', position: 'absolute' }
+  viewport: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: 0 }
 })
