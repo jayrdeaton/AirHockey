@@ -4,7 +4,7 @@ import { EdgeInsets } from 'react-native-safe-area-context'
 import { DESKTOP_WEB_MIN_WIDTH, FACEOFF_ZONE_RADIUS_RATIO, GOAL_LINE_STROKE_WIDTH, GOAL_OPEN_FRACTION, PADDLE_SIZE_RATIOS, PUCK_SIZE_RATIOS, TABLE_LONG_TO_SHORT_RATIO, WALL_THICKNESS } from '@/constants/game'
 import { BoardLayout, GoalAxis, GoalPost, GoalSide, PaddleSizeLevel, Player, PuckSizeLevel } from '@/types'
 
-// Mirrors game.tsx's own isDesktopWeb — desktop web is the only context that fixes the board to
+// Mirrors game.tsx's own isDesktopWeb - desktop web is the only context that fixes the board to
 // its real-world aspect ratio (TABLE_LONG_TO_SHORT_RATIO) rather than filling the viewport
 // exactly, and draws literal perimeter walls into the margin that leaves. Native and mobile web
 // fill their container exactly, so the device's own physical edge already reads as the boundary
@@ -25,8 +25,8 @@ export function computeViewportSize(screenWidth: number, screenHeight: number, i
   }
 }
 
-// The short/long extents of the LOCAL board container — S (short axis, where the goal sits) and
-// L (long axis, goal-to-goal) — derived from whichever real screen dimension is currently short
+// The short/long extents of the LOCAL board container - S (short axis, where the goal sits) and
+// L (long axis, goal-to-goal) - derived from whichever real screen dimension is currently short
 // vs. long given goalAxis. game.tsx uses this directly to size the View it rotates (see
 // GoalAxis's own doc comment in types/index.ts): the container is always laid out S-wide by
 // L-tall in local terms, then rotated ±90° onto the real screen when goalAxis is 'horizontal'.
@@ -47,7 +47,7 @@ export function computeLocalContainerSize(screenWidth: number, screenHeight: num
   return { width: S, height: L }
 }
 
-// Which local side (always 'bottom' for player 1, 'top' for player 2 — see GoalSide's own doc
+// Which local side (always 'bottom' for player 1, 'top' for player 2 - see GoalSide's own doc
 // comment) a given player defends. A plain function of the player number, not board state: this
 // convention never varies board-to-board, so there's nothing to store on BoardLayout itself.
 export function playerGoalSide(player: Player): GoalSide {
@@ -66,10 +66,10 @@ function buildGoalPosts(x: number, y: number, height: number, goalStart: number,
 }
 
 // Single source of truth for rink geometry, always expressed in the canonical LOCAL space (see
-// GoalSide's own doc comment in types/index.ts) — goals on the local top/bottom regardless of the
+// GoalSide's own doc comment in types/index.ts) - goals on the local top/bottom regardless of the
 // real device orientation. goalAxis is accepted only to decide which real screen dimension is
 // currently "short" vs. "long" (so puck/paddle/goal sizing always derives from the true short
-// edge, whichever real axis that happens to be right now) — it never branches the geometry itself
+// edge, whichever real axis that happens to be right now) - it never branches the geometry itself
 // beyond that, unlike BoxHockey's board.ts, which never needed to make that distinction at all
 // since its board is permanently portrait.
 export function computeBoardLayout(screenWidth: number, screenHeight: number, insets: EdgeInsets, goalAxis: GoalAxis, puckSize: PuckSizeLevel = 'medium', paddleSize: PaddleSizeLevel = 'medium'): BoardLayout {
@@ -89,7 +89,7 @@ export function computeBoardLayout(screenWidth: number, screenHeight: number, in
   const goalEnd = goalStart + goalWidth
 
   // Real air-hockey table geometry, unconditional (not an opt-in toggle like BoxHockey's
-  // `rink: boolean`) — rounded outer corners and a real pocket behind each goal the puck can
+  // `rink: boolean`) - rounded outer corners and a real pocket behind each goal the puck can
   // skate into, so it can never permanently stall in a corner. Same formulas BoxHockey uses for
   // its opt-in rink-on case, evaluated against the local short axis S.
   const behindGoalDepth = puckRadius * 2.5 + WALL_THICKNESS
@@ -130,7 +130,7 @@ export function centerPuck(board: BoardLayout): { x: number; y: number } {
   return { x: board.centerX, y: board.centerY }
 }
 
-// A player's defensive rest position — their own goal line, offset in — used to reset both
+// A player's defensive rest position - their own goal line, offset in - used to reset both
 // paddles after a goal (see GOAL_SERVE in useGameState.ts) and as the AI's own "retreat and cover
 // the net" target when the puck isn't a threat (see aiOpponent.ts).
 const PADDLE_HOME_OFFSET_RATIO = 1.5
@@ -142,10 +142,10 @@ export function centerPaddle(board: BoardLayout, player: Player): { x: number; y
 }
 
 // Rink faceoff circle positions, ported from BoxHockey's own faceoffZoneCenters unchanged (same
-// 0.27/0.42 offsets — BoxHockey's non-gauntlet faceoffOffsetYRatio) — two per player, flanking
+// 0.27/0.42 offsets - BoxHockey's non-gauntlet faceoffOffsetYRatio) - two per player, flanking
 // their own goal. Board.tsx renders both purely as static rink chrome (see FACEOFF_ZONE_RADIUS_
 // RATIO's own comment); useGameState's GOAL_SERVE is the only thing that actually PICKS one (see
-// faceoffZoneCenter below) — the scored-on player's own zone, giving them the restart, same as a
+// faceoffZoneCenter below) - the scored-on player's own zone, giving them the restart, same as a
 // real rink awards the ensuing faceoff to whoever just conceded. There's no board-variant knob to
 // key faceoffOffsetYRatio off, so it's inlined rather than carried as a BoardLayout field the way
 // BoxHockey needs it to be.
@@ -170,10 +170,10 @@ export function faceoffZoneRadius(board: BoardLayout): number {
   return board.width * FACEOFF_ZONE_RADIUS_RATIO
 }
 
-// Clamps a target position to a player's own playable half — both the board's own outer bounds
+// Clamps a target position to a player's own playable half - both the board's own outer bounds
 // (minus radius) AND their own side of the local centerline (minus radius, so the paddle disc's
 // own edge stops exactly at the centerline rather than overlapping it). Shared by
-// TouchInputLayer's setPaddleTarget (a human's live drag) and aiOpponent's target selection — the
+// TouchInputLayer's setPaddleTarget (a human's live drag) and aiOpponent's target selection - the
 // same clamp rule applies to both input sources, so it lives here once.
 export function clampToOwnHalf(x: number, y: number, board: BoardLayout, player: Player, radius: number): { x: number; y: number } {
   const minX = board.x + radius

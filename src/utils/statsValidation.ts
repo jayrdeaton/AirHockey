@@ -9,7 +9,7 @@ import { AiDifficulty, GoalTotals, MatchRecord, ProfileStats, StatsState, TwoPla
 // A zeroed vsCpu bucket: an empty win/loss/draw record, an empty per-difficulty breakdown, and a
 // zeroed win streak. Built from @tastic/achievements' own defaults rather than restating the
 // literals, so this can't drift from the shapes those helpers actually produce. A function, not a
-// constant — DEFAULT_PROFILE_STATS and DEFAULT_STATS below each need their own independent object,
+// constant - DEFAULT_PROFILE_STATS and DEFAULT_STATS below each need their own independent object,
 // not two references to the same one (every consumer only ever spreads/reads these today, but a
 // shared reference is a standing invitation for a future in-place mutation to corrupt both at once).
 function createDefaultVsCpu(): VsCpuStats {
@@ -32,7 +32,7 @@ function createDefaultGoals(): GoalTotals {
   return { scored: 0, conceded: 0 }
 }
 
-// A fresh profile's starting bucket — same zeroed vsCpu/twoPlayer/goals shape as DEFAULT_STATS' own
+// A fresh profile's starting bucket - same zeroed vsCpu/twoPlayer/goals shape as DEFAULT_STATS' own
 // top-level fields, since ProfileStats mirrors StatsState's decomposable parts (see types/index.ts).
 export const DEFAULT_PROFILE_STATS: ProfileStats = {
   vsCpu: createDefaultVsCpu(),
@@ -45,7 +45,7 @@ export const DEFAULT_PROFILE_STATS: ProfileStats = {
 }
 
 // vsCpu/twoPlayer/goals are re-created here rather than spread straight from DEFAULT_PROFILE_STATS,
-// specifically so the two don't end up aliasing the same nested objects — see createDefaultVsCpu's
+// specifically so the two don't end up aliasing the same nested objects - see createDefaultVsCpu's
 // own doc.
 export const DEFAULT_STATS: StatsState = {
   ...DEFAULT_PROFILE_STATS,

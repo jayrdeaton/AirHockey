@@ -5,11 +5,11 @@ import { centerPaddle, computeBoardLayout } from '@/utils/board'
 const insets = { top: 0, bottom: 0, left: 0, right: 0 }
 const board = computeBoardLayout(400, 900, insets, 'vertical', 'medium')
 
-describe('computeAIPaddleTarget — threat gate', () => {
+describe('computeAIPaddleTarget - threat gate', () => {
   it('chases a puck on its own half moving toward its own goal (player 2 defends top)', () => {
     // Offset derived from paddleRadius (not a fixed pixel count) so this stays clear of the
     // near-goal clamp band (clampToOwnHalf's minY = board.y + paddleRadius) regardless of paddle
-    // size — too close in and the predicted-position target legitimately overshoots past the
+    // size - too close in and the predicted-position target legitimately overshoots past the
     // puck's CURRENT position while still correctly chasing its PREDICTED one, which this
     // assertion (measured against the current position) isn't meant to exercise.
     const puck = { x: board.centerX, y: board.y + board.paddleRadius * 5, vx: 0, vy: -3 } // on P2's half, heading further into it
@@ -42,7 +42,7 @@ describe('computeAIPaddleTarget — threat gate', () => {
   })
 })
 
-describe('computeAIPaddleTarget — loose puck (kickoff / faceoff serve)', () => {
+describe('computeAIPaddleTarget - loose puck (kickoff / faceoff serve)', () => {
   it('chases a stationary puck sitting dead center (game-start kickoff), instead of sitting home', () => {
     const puck = { x: board.centerX, y: board.centerY, vx: 0, vy: 0 }
     const ownPaddle = { ...centerPaddle(board, 2), vx: 0, vy: 0 }
@@ -61,7 +61,7 @@ describe('computeAIPaddleTarget — loose puck (kickoff / faceoff serve)', () =>
     expect(distToPuckAfter).toBeLessThan(distToPuckBefore)
   })
 
-  it("still retreats home for a stopped puck deep on the OPPONENT's half — that's their puck to reach first", () => {
+  it("still retreats home for a stopped puck deep on the OPPONENT's half - that's their puck to reach first", () => {
     const puck = { x: board.centerX, y: board.y + board.height - 30, vx: 0, vy: 0 }
     const ownPaddle = { x: board.centerX + 60, y: board.y + 100, vx: 0, vy: 0 }
     const home = centerPaddle(board, 2)
@@ -86,7 +86,7 @@ describe('rollAIJitter', () => {
   })
 })
 
-describe('computeAIPaddleTarget — difficulty tiers', () => {
+describe('computeAIPaddleTarget - difficulty tiers', () => {
   it('a harder difficulty approaches its target faster than an easier one, when both are far from it', () => {
     const puck = { x: board.centerX + board.width * 0.3, y: board.y + 20, vx: 0, vy: -1 }
     const ownPaddle = { ...centerPaddle(board, 2), vx: 0, vy: 0 } // far from the puck's own corner
@@ -98,7 +98,7 @@ describe('computeAIPaddleTarget — difficulty tiers', () => {
   })
 })
 
-describe('computeAIPaddleTarget — clamping', () => {
+describe('computeAIPaddleTarget - clamping', () => {
   it('never returns a target that crosses the centerline, regardless of jitter', () => {
     const puck = { x: board.centerX, y: board.y + 5, vx: 0, vy: -5 }
     const ownPaddle = { ...centerPaddle(board, 2), vx: 0, vy: 0 }
@@ -108,7 +108,7 @@ describe('computeAIPaddleTarget — clamping', () => {
 
   it("the per-tick step is bounded by the difficulty's own maxApproachSpeed fraction of MAX_PADDLE_SPEED", () => {
     // Puck far across the board from the paddle's current position, so the raw (pre-clamp) target
-    // distance is large — the rate-of-approach clamp must be what actually limits the step.
+    // distance is large - the rate-of-approach clamp must be what actually limits the step.
     const puck = { x: board.x + board.width * 0.9, y: board.y + 10, vx: 0, vy: -2 }
     const ownPaddle = { x: board.x + board.width * 0.1, y: board.y + board.height * 0.4, vx: 0, vy: 0 }
     const target = computeAIPaddleTarget(puck, ownPaddle, board, 2, 'medium')

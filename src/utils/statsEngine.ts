@@ -4,7 +4,7 @@ import { Profile } from '@tastic/profile'
 import { AiDifficulty, GameMode, Player, ProfileStats, StatsState } from '@/types'
 import { DEFAULT_PROFILE_STATS } from '@/utils/statsValidation'
 
-// One finished match, as the stats layer sees it — built by game.tsx the instant phase flips to
+// One finished match, as the stats layer sees it - built by game.tsx the instant phase flips to
 // 'gameOver', entirely from state that's already on screen.
 export interface MatchOutcome {
   winner: Player
@@ -22,7 +22,7 @@ export interface MatchContext {
   profileIds?: Partial<Record<Player, string>>
 }
 
-// AirHockey has no draws — a match ends the instant one side reaches scoreToWin — so this only ever
+// AirHockey has no draws - a match ends the instant one side reaches scoreToWin - so this only ever
 // returns 'win' or 'loss'. Routed through resultFor so the rule lives in one place.
 function seatResult(outcome: MatchOutcome, seat: Player): RoundResult {
   return resultFor(outcome.winner, seat)
@@ -67,7 +67,7 @@ function bumpForSeat(prev: ProfileStats, outcome: MatchOutcome, context: MatchCo
   }
 }
 
-// `now` defaults to the real clock — overridable so tests can drive day boundaries directly.
+// `now` defaults to the real clock - overridable so tests can drive day boundaries directly.
 export function applyMatchOutcome(prev: StatsState, outcome: MatchOutcome, context: MatchContext, now: Date = new Date()): StatsState {
   const isFirstGameEver = prev.vsCpu.played + prev.twoPlayer.played === 0
   const firstGameResult = isFirstGameEver ? seatResult(outcome, 1) : prev.firstGameResult
@@ -95,7 +95,7 @@ export function getOverallTotals(stats: ProfileStats): { played: number; wins: n
 }
 
 // Synthesizes a full StatsState-shaped view from one profile's bucket, so the same predicates
-// evaluate it unchanged. firstGameResult is never read through this view — the one achievement
+// evaluate it unchanged. firstGameResult is never read through this view - the one achievement
 // that touches it is scope:'device'.
 export function getProfileStatsView(profileStats: ProfileStats): StatsState {
   return { ...profileStats, profiles: {}, firstGameResult: null }
@@ -109,7 +109,7 @@ export interface ProfileRanking {
   winRate: number
 }
 
-// Sorted by wins then win rate, both descending — a profile with nothing recorded still appears at
+// Sorted by wins then win rate, both descending - a profile with nothing recorded still appears at
 // played: 0, so a freshly created one shows up immediately.
 export function getProfileRankings(profiles: Profile[], profileStats: Record<string, ProfileStats>): ProfileRanking[] {
   return profiles

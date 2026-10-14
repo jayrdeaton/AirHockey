@@ -19,13 +19,13 @@ export interface BoardProps {
   scores: [number, number]
   scoreToWin: number
   lastScoredGoal: GoalSide | null
-  // Same "counter + kind" shape as useGameState's own bounceCount — bumped whenever the puck
+  // Same "counter + kind" shape as useGameState's own bounceCount - bumped whenever the puck
   // struck the invisible one-way goal-mouth door (see physics.ts's goalDoorHit). Drives the
   // goal-door flash below; never resets between rounds, so that effect diffs against a ref rather
   // than expecting a return to 0.
   goalDoorHitCount: number
   lastGoalDoorSide: GoalSide | null
-  // Perimeter walls (all four sides) — see game.tsx's isDesktopWeb. On a phone (native or mobile
+  // Perimeter walls (all four sides) - see game.tsx's isDesktopWeb. On a phone (native or mobile
   // web) they'd sit redundantly right against the device's own physical edge, which already reads
   // as the boundary; only desktop web, with no such edge, gets them.
   showWalls: boolean
@@ -40,7 +40,7 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
 
   const { colors: themeColors, dark } = useAutoPaperTheme()
 
-  // Retro-vector palette — same convention as BoxHockey/LightCycles: the board's own structure
+  // Retro-vector palette - same convention as BoxHockey/LightCycles: the board's own structure
   // (walls/goal lines) is a literal black/white-by-appearance neutral, not a themed color, since
   // it's scaffolding rather than a gameplay signal; a player's own puck/paddle/goal accents are
   // the only saturated color on screen.
@@ -51,7 +51,7 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
   const p2Color = themeColors.secondary
 
   // ─── Puck ring pulse ────────────────────────────────────────────────────────
-  // A gentle "not live yet" breathe during the pre-game/post-goal pause — plain white and static
+  // A gentle "not live yet" breathe during the pre-game/post-goal pause - plain white and static
   // once play is actually live, unlike BoxHockey's per-player-colored idle ring (there's no
   // "whose turn" concept here to color it by).
   const waiting = phase !== 'live'
@@ -68,9 +68,9 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
   const ringOpacity = useDerivedValue(() => (waiting ? 0.55 + idlePulseT.value * 0.35 : 1))
 
   // ─── Goal crease / score arcs ──────────────────────────────────────────────
-  // The crease doubles as the score meter — see computeGoalWedges' own doc comment. Player 1
+  // The crease doubles as the score meter - see computeGoalWedges' own doc comment. Player 1
   // always sits at the local bottom (see playerGoalSide in utils/board.ts), so p1's crease/wedges
-  // are anchored at y+height/baseAngle 180, and p2's at y/baseAngle 0 — same convention BoxHockey
+  // are anchored at y+height/baseAngle 180, and p2's at y/baseAngle 0 - same convention BoxHockey
   // uses, ported unchanged.
   const goalCreaseRadius = board.goalWidth / 2
 
@@ -92,17 +92,17 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
 
   // Wedge angle math lives in @tastic/physics (computeGoalWedges); the Skia path-building +
   // filled/unfilled-by-score rendering is now @tastic/sprites' ScoreWedges (see its "Score arcs"
-  // render usage below) — this just supplies the raw angle array each expects.
+  // render usage below) - this just supplies the raw angle array each expects.
   const p1WedgeAngles = useMemo(() => computeGoalWedges(scoreToWin, 180), [scoreToWin])
   const p2WedgeAngles = useMemo(() => computeGoalWedges(scoreToWin, 0), [scoreToWin])
 
   // ─── Rink pocket perimeter (curved caps behind each goal) ──────────────────
   // Ported from BoxHockey's opt-in 'rink' case, now the only geometry there is (see
-  // computeBoardLayout — cornerRadius/behindGoalDepth are unconditional). Unlike BoxHockey (where
+  // computeBoardLayout - cornerRadius/behindGoalDepth are unconditional). Unlike BoxHockey (where
   // this same curve is a debug-only aid, hidden by default since its rink is an opt-in toggle most
-  // rounds never use — the "safe area" behind the goal simply isn't reachable to begin with when
+  // rounds never use - the "safe area" behind the goal simply isn't reachable to begin with when
   // rink is off there), AirHockey's pocket is a permanent, unconditional part of every board, so a
-  // player can always drift or get knocked back there — the curve marking where it actually
+  // player can always drift or get knocked back there - the curve marking where it actually
   // bounces is real, load-bearing information every round, not a tuning aid, so it's drawn always
   // (see the render usage below) rather than gated behind a debug flag.
   const rinkPerimeterPath = useMemo(() => {
@@ -125,19 +125,19 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
 
   // ─── Goal celebration rings ─────────────────────────────────────────────────
   // Timing/opacity/stroke-width machinery (850/160/320ms stagger, 0.75 peak opacity, 2.5/2/1.5
-  // stroke widths) now lives in @tastic/sprites' CelebrationRings — see its render usage below.
+  // stroke widths) now lives in @tastic/sprites' CelebrationRings - see its render usage below.
   const celebCY = lastScoredGoal === 'top' ? y : y + height
   const celebColor = lastScoredGoal === 'top' ? p2Color : p1Color
 
   // ─── Goal door flash (puck hit the invisible one-way door at the goal mouth) ────────────────
   // Two-layer color/opacity decay + hit-count/side gating (ported from BoxHockey unchanged) now
-  // lives in @tastic/sprites' GoalDoorFlash — see its render usage below.
+  // lives in @tastic/sprites' GoalDoorFlash - see its render usage below.
 
   const paddleRingRadius = paddleRadius * 0.35
 
   // ─── Zone lines ─────────────────────────────────────────────────────────────
   // A rink's blue-line equivalent, ported from BoxHockey unchanged: a bold full-width bar, in
-  // each player's own color, sitting further out than the goal crease but short of center — real
+  // each player's own color, sitting further out than the goal crease but short of center - real
   // blue lines sit about 70% of the way from the goal line to center ice, hence the 0.72
   // fraction. Spans the full board width the way a real blue line spans the full rink, so it
   // reads as "this whole zone is yours" rather than another marker for the goal itself.
@@ -146,7 +146,7 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
   const p2ZoneLineY = y + (height / 2) * zoneLineFraction
 
   // ─── Rink faceoff circles ───────────────────────────────────────────────────
-  // Purely decorative rink chrome, ported from BoxHockey's own faceoff-circle layout — unlike
+  // Purely decorative rink chrome, ported from BoxHockey's own faceoff-circle layout - unlike
   // there, AirHockey has no turn-based draw for these to gate (a goal just re-centers the puck,
   // see useGameState's GOAL_SERVE), so only the "permanent chrome" ring + center dot BoxHockey
   // itself renders in every state alike ever shows here; none of its live/pulse/ripple states
@@ -167,43 +167,43 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
         <ScoreWedges cx={goalCX} cy={y + height} radius={goalCreaseRadius} wedges={p1WedgeAngles} score={scores[0]} color={p1Color} unfilledColor={lineColor} />
         <ScoreWedges cx={goalCX} cy={y} radius={goalCreaseRadius} wedges={p2WedgeAngles} score={scores[1]} color={p2Color} unfilledColor={lineColor} />
 
-        {/* Rink faceoff circles — see the comment above. */}
+        {/* Rink faceoff circles - see the comment above. */}
         {faceoffCenters.map((c, i) => (
           <FaceoffCircle key={i} x={c.cx} y={c.cy} radius={faceoffRadius} color={c.color} />
         ))}
 
-        {/* Centerline — marks the boundary neither paddle can cross (see clampToOwnHalf in
+        {/* Centerline - marks the boundary neither paddle can cross (see clampToOwnHalf in
             utils/board.ts) so it reads as a real rule of the table, not just decoration. */}
         <Line p1={vec(x, board.centerY)} p2={vec(x + width, board.centerY)} color={centerLineColor} strokeWidth={2} />
 
-        {/* Zone lines — see the comment above. */}
+        {/* Zone lines - see the comment above. */}
         <ZoneLine x={x} width={width} y={p1ZoneLineY} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
         <ZoneLine x={x} width={width} y={p2ZoneLineY} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
 
-        {/* Goal lines — BoxHockey only colors these when its opt-in rink pocket is on (plain
-            wallColor otherwise, since a rink-off goal line IS the solid boundary — see its own
+        {/* Goal lines - BoxHockey only colors these when its opt-in rink pocket is on (plain
+            wallColor otherwise, since a rink-off goal line IS the solid boundary - see its own
             comment). AirHockey's pocket is unconditional, so this side of that same branch is the
             only one that ever applies: always colored, because there's always an open pocket
-            behind this line for it to mark, never a solid boundary of its own — see the perimeter
+            behind this line for it to mark, never a solid boundary of its own - see the perimeter
             walls just below, which follow the OTHER half of that same rink-on/off branch. */}
         <Line p1={vec(x, y)} p2={vec(goalAbsLeft, y)} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
         <Line p1={vec(goalAbsRight, y)} p2={vec(x + width, y)} color={p2Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
         <Line p1={vec(x, y + height)} p2={vec(goalAbsLeft, y + height)} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
         <Line p1={vec(goalAbsRight, y + height)} p2={vec(x + width, y + height)} color={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} />
 
-        {/* Goal door flash — fills in exactly the gap the two goal-line <Line>s above deliberately
+        {/* Goal door flash - fills in exactly the gap the two goal-line <Line>s above deliberately
             leave open (goalAbsLeft..goalAbsRight). Invisible at rest until a real door hit snaps
-            both layers on — this is the ONLY visual cue that the gap isn't actually open. */}
+            both layers on - this is the ONLY visual cue that the gap isn't actually open. */}
         <GoalDoorFlash leftX={goalAbsLeft} rightX={goalAbsRight} topY={y} bottomY={y + height} topColor={p2Color} bottomColor={p1Color} strokeWidth={GOAL_LINE_STROKE_WIDTH} hitCount={goalDoorHitCount} hitSide={lastGoalDoorSide} />
 
-        {/* Rink pocket boundary — the curved caps built above, now always drawn (see that
+        {/* Rink pocket boundary - the curved caps built above, now always drawn (see that
             comment). Also the only perimeter boundary ever drawn on the table's long sides at all:
             the `showWalls && !rinkPerimeterPath` Rect fallback just below never fires, the same
-            `showWalls &&` (no rink check) contradiction BoxHockey itself guards against — a solid
+            `showWalls &&` (no rink check) contradiction BoxHockey itself guards against - a solid
             Rect flanking the goal would draw a non-crossable boundary directly abutting a goal
             line/post that's marking a crossable one (see the goal lines' own comment just above).
             Since AirHockey's pocket is unconditional, rinkPerimeterPath is never null, so that
-            fallback is permanently dead — same effective outcome BoxHockey's own rink-on case
+            fallback is permanently dead - same effective outcome BoxHockey's own rink-on case
             reaches, structurally identical rather than special-cased away. */}
         <Path path={rinkPerimeterPath} style='stroke' strokeWidth={wallThickness} strokeCap='round' color={wallColor} />
         {showWalls && !rinkPerimeterPath && (
@@ -217,18 +217,18 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
           </>
         )}
 
-        {/* Obstacles — always empty (an open rink has no center divider); kept so a future variant
+        {/* Obstacles - always empty (an open rink has no center divider); kept so a future variant
             could add some without touching this render loop. */}
         {obstacles.map((obs, i) => (
           <Rect key={i} x={obs.x} y={obs.y} width={obs.width} height={obs.height} color={wallColor} />
         ))}
 
-        {/* Goal posts — small round pegs colored per-goal, not the neutral wallColor. */}
+        {/* Goal posts - small round pegs colored per-goal, not the neutral wallColor. */}
         {goalPosts.map((post, i) => (
           <GoalPost key={i} x={post.x} y={post.y} radius={post.radius} color={post.player === 1 ? p1Color : p2Color} />
         ))}
 
-        {/* Paddles — a live, finger-controlled disc (unlike BoxHockey's swing-animated stick):
+        {/* Paddles - a live, finger-controlled disc (unlike BoxHockey's swing-animated stick):
             position is driven directly by state.paddles[player] every tick, no aim/swing state to
             preview. A smaller, lighter inner ring gives it a "mallet knob" read. */}
         <Circle cx={paddles[1].x} cy={paddles[1].y} r={paddleRadius} color={p1Color} />
@@ -236,7 +236,7 @@ export default function Board({ board, puck, paddles, phase, scores, scoreToWin,
         <Circle cx={paddles[2].x} cy={paddles[2].y} r={paddleRadius} color={p2Color} />
         <Circle cx={paddles[2].x} cy={paddles[2].y} r={paddleRingRadius} style='stroke' strokeWidth={2.5} color='#FFFFFF' />
 
-        {/* Puck — flat black fill + a white ring that softly breathes while waiting to go live. */}
+        {/* Puck - flat black fill + a white ring that softly breathes while waiting to go live. */}
         <Disc x={puck.x} y={puck.y} radius={puckRadius} color='#000000' ringColor='#FFFFFF' ringOpacity={ringOpacity} />
 
         {/* Celebration rings */}

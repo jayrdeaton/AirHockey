@@ -11,16 +11,16 @@ type PaddleTargets = Record<Player, { x: number; y: number }>
 type Action = { type: 'TICK'; board: BoardLayout; dt: number; targets: PaddleTargets } | { type: 'START' } | { type: 'GOAL_SERVE'; board: BoardLayout; zoneIndex: 0 | 1 } | { type: 'RESET'; board: BoardLayout } | { type: 'RESCALE'; prevBoard: BoardLayout; board: BoardLayout }
 
 // Puck/paddle positions are stored in absolute pixels tied to a specific BoardLayout, but board
-// itself can change at any moment — not just once at mount: useSafeAreaInsets/useOrientationState
+// itself can change at any moment - not just once at mount: useSafeAreaInsets/useOrientationState
 // both resolve asynchronously after game.tsx's first paint, a live browser/window resize can fire at
 // any time, and rotating the device mid-rally genuinely changes GoalAxis. Remaps a point by its
 // FRACTIONAL position within the old board's playing field onto the same fraction of the new
 // one (and scales velocity by the same ratio, so an in-flight puck's speed stays proportionally
-// consistent) — this is what actually keeps the puck/paddles sane across every one of those
+// consistent) - this is what actually keeps the puck/paddles sane across every one of those
 // cases, in every phase, rather than only patching the pre-game settling window.
 function rescalePoint<T extends { x: number; y: number; vx: number; vy: number }>(point: T, prevBoard: BoardLayout, board: BoardLayout): T {
   // A degenerate zero-sized prevBoard (e.g. web's very first render, before hydration has a real
-  // window size to measure) has nothing sane to compute a fraction FROM — fall back to dead
+  // window size to measure) has nothing sane to compute a fraction FROM - fall back to dead
   // center rather than dividing by zero into NaN.
   const degenerate = prevBoard.width <= 0 || prevBoard.height <= 0
   const fx = degenerate ? 0.5 : (point.x - prevBoard.x) / prevBoard.width
@@ -56,11 +56,11 @@ function pocketSide(puck: PuckState, board: BoardLayout): GoalSide | null {
 }
 
 // Commits one player's paddle from its raw target position into a real, velocity-bearing
-// PaddleState — an EMA over the instantaneous per-tick velocity (rather than a plain moving-
+// PaddleState - an EMA over the instantaneous per-tick velocity (rather than a plain moving-
 // average ring buffer) so a single jittery touch sample can't read as a wild instantaneous
 // velocity: PADDLE_VELOCITY_SMOOTHING_FRAMES doubles as the EMA's effective window, expressed
 // purely as a function of the PREVIOUS committed paddle state (already itself smoothed from the
-// tick before) — no separate history buffer needs to live anywhere.
+// tick before) - no separate history buffer needs to live anywhere.
 function commitPaddle(prev: PaddleState, target: { x: number; y: number }, dt: number): PaddleState {
   const instant = computePaddleVelocity(prev.x, prev.y, target.x, target.y, dt)
   const alpha = 1 / PADDLE_VELOCITY_SMOOTHING_FRAMES
@@ -104,7 +104,7 @@ export function makeReducer(scoreToWin: number, friction: number) {
           const scores: [number, number] = [state.scores[0], state.scores[1]]
           scores[result.scored - 1]++
           const nextPuck: PuckState = { x: result.x, y: result.y, vx: 0, vy: 0 }
-          // Player 1 scores by entering the LOCAL TOP goal (player 2's own crease — see
+          // Player 1 scores by entering the LOCAL TOP goal (player 2's own crease - see
           // playerGoalSide in utils/board.ts and stepPhysics' own scored:1/2 convention), so the
           // celebration's physical side is the inverse of the scoring player number.
           const lastScoredGoal = result.scored === 1 ? 'top' : 'bottom'
@@ -116,7 +116,7 @@ export function makeReducer(scoreToWin: number, friction: number) {
 
         const bounceCount = result.bounced ? state.bounceCount + 1 : state.bounceCount
 
-        // Unlike BoxHockey, a stopped puck does not end anything here — there is no turn to pass.
+        // Unlike BoxHockey, a stopped puck does not end anything here - there is no turn to pass.
         // It simply sits there, mid-rally, until a paddle touches it again, same as a real table.
         // Except behind a goal line, where no paddle can follow it. Pucks back there skip friction
         // (see stepPhysicsOnce), but every bounce between the one-way door and the pocket's back
@@ -134,11 +134,11 @@ export function makeReducer(scoreToWin: number, friction: number) {
         return { ...state, puck: result, paddles, bounceCount, goalDoorHitCount, lastGoalDoorSide, pocketDoorHit }
       }
 
-      // Post-goal re-serve — see useGameState's own GOAL_SERVE_PAUSE_MS timer. Unlike BoxHockey
+      // Post-goal re-serve - see useGameState's own GOAL_SERVE_PAUSE_MS timer. Unlike BoxHockey
       // there's no possession/turn logic to resolve here (either player can go for the puck the
       // instant it lands), but the SPOT itself isn't neutral: the puck spawns at one of the
       // scored-on player's own rink faceoff zones (action.zoneIndex, randomized at the dispatch
-      // site below — reducers stay pure) rather than dead center, the same way a real rink awards
+      // site below - reducers stay pure) rather than dead center, the same way a real rink awards
       // the ensuing faceoff to whoever just conceded.
       case 'GOAL_SERVE': {
         if (state.phase !== 'goalScored') return state
@@ -174,7 +174,7 @@ export function makeReducer(scoreToWin: number, friction: number) {
 export function useGameState(board: BoardLayout, scoreToWin: number, friction: number, paused: boolean) {
   // Passing a freshly-made reducer on every render (rather than memoizing it) is safe and
   // intentional: React always uses the CURRENT render's reducer argument to process any pending
-  // dispatch, and dispatch's own identity stays stable regardless — so scoreToWin/friction changes
+  // dispatch, and dispatch's own identity stays stable regardless - so scoreToWin/friction changes
   // are picked up immediately, with no stale-closure ref indirection needed.
   const [state, dispatch] = useReducer(makeReducer(scoreToWin, friction), board, makeInitialState)
 
@@ -183,11 +183,11 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
     boardRef.current = board
   })
 
-  // Raw, unthrottled paddle targets — written every touch sample (TouchInputLayer) or AI decision
+  // Raw, unthrottled paddle targets - written every touch sample (TouchInputLayer) or AI decision
   // (useAIOpponent) via setPaddleTarget below, WITHOUT dispatching (a dispatch per touch sample
   // would re-render well over 60 times a second on some devices). The physics tick reads whatever
-  // this ref currently holds once per animation frame — the same cadence stepPhysics itself runs
-  // at — and folds the read into the SAME TICK dispatch that also steps the puck, so a player's
+  // this ref currently holds once per animation frame - the same cadence stepPhysics itself runs
+  // at - and folds the read into the SAME TICK dispatch that also steps the puck, so a player's
   // and the AI's target both flow through this identical commit path (see commitPaddle above).
   const paddleTargetsRef = useRef<PaddleTargets>({ 1: centerPaddle(board, 1), 2: centerPaddle(board, 2) })
 
@@ -199,11 +199,11 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
   useGameLoop((dt) => dispatch({ type: 'TICK', board: boardRef.current, dt, targets: paddleTargetsRef.current }), { enabled: state.phase === 'live' && !paused, maxDt: 2.5 })
 
   // useReducer's lazy init (the `board` argument passed to useReducer below) only ever runs ONCE,
-  // at this hook's very first mount — but `board` itself can change again at any later point too:
+  // at this hook's very first mount - but `board` itself can change again at any later point too:
   // useSafeAreaInsets/useOrientationState both resolve asynchronously after game.tsx's first paint, a
   // live window resize can fire at any time, and rotating the device mid-rally genuinely changes
   // GoalAxis. Rescaling on every board change (see rescalePoint above), not just while idle, is
-  // what actually keeps the puck/paddles' absolute-pixel positions sane across all of those —
+  // what actually keeps the puck/paddles' absolute-pixel positions sane across all of those -
   // including the pre-game settling window, where it's simply invisible since nothing's moved yet.
   const prevBoardRef = useRef(board)
   useEffect(() => {
@@ -211,7 +211,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
     if (board === prevBoard) return
     prevBoardRef.current = board
     // A degenerate zero-sized prevBoard (web's very first render, before hydration has a real
-    // window size to measure) can only ever be true right at mount — real gameplay can't have
+    // window size to measure) can only ever be true right at mount - real gameplay can't have
     // happened against a board with 0 width. Re-centering fresh (each point at its OWN correct
     // spot) rather than fractionally rescaling from it is what actually matters here: rescalePoint
     // treats a degenerate prevBoard as "everything was at the 0.5,0.5 fraction" (its own last-
@@ -227,7 +227,7 @@ export function useGameState(board: BoardLayout, scoreToWin: number, friction: n
   }, [board])
 
   // Owns the idle->live and goalScored->live pauses itself, rather than pushing timer bookkeeping
-  // out to game.tsx — this is the game's own internal rhythm, not something the screen layer
+  // out to game.tsx - this is the game's own internal rhythm, not something the screen layer
   // needs to orchestrate. Re-runs (and so restarts the pause from scratch) whenever `paused`
   // toggles, so a settings/quit-confirm dialog opened mid-pause doesn't let the puck go live off
   // a stale timer that counted time the dialog was covering the board.

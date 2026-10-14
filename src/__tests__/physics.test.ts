@@ -2,7 +2,7 @@ import { MAX_PADDLE_SPEED, PADDLE_COLLISION_RESTITUTION } from '@/constants/game
 import { BoardLayout } from '@/types'
 import { applyPaddleCollision, clampPaddleSpeed, computePaddleVelocity, stepPhysics } from '@/utils/physics'
 
-// A standard test board with no goalposts/obstacles — isolates wall/goal-line behavior from
+// A standard test board with no goalposts/obstacles - isolates wall/goal-line behavior from
 // goalpost deflection, same discipline BoxHockey's own physics.test.ts fixture uses.
 const board: BoardLayout = {
   x: 10,
@@ -28,7 +28,7 @@ const cx = board.x + board.width / 2 // 160
 const cy = board.y + board.height / 2 // 260
 const r = board.puckRadius // 18
 
-describe('stepPhysics — wall bounces', () => {
+describe('stepPhysics - wall bounces', () => {
   it('bounces off left wall and reverses vx', () => {
     const puck = { x: board.x + r + 1, y: cy, vx: -5, vy: 0 }
     const result = stepPhysics(puck, board)
@@ -81,10 +81,10 @@ describe('stepPhysics — wall bounces', () => {
   })
 })
 
-describe('stepPhysics — goal detection', () => {
+describe('stepPhysics - goal detection', () => {
   const goalAbsLeft = board.x + board.goalStart // 120
   const goalAbsRight = board.x + board.goalEnd // 200
-  const safeX = (goalAbsLeft + goalAbsRight) / 2 // 160 — dead center
+  const safeX = (goalAbsLeft + goalAbsRight) / 2 // 160 - dead center
 
   it('scores P1 once the puck has fully cleared the top goal line (player 2 defends top)', () => {
     const puck = { x: safeX, y: board.y + 5, vx: 0, vy: -50 }
@@ -99,7 +99,7 @@ describe('stepPhysics — goal detection', () => {
     expect(result.scored).toBe(2)
   })
 
-  it('does NOT score merely touching the goal line — has to clear it entirely', () => {
+  it('does NOT score merely touching the goal line - has to clear it entirely', () => {
     const puck = { x: safeX, y: board.y + r - 1, vx: 0, vy: -5 }
     const result = stepPhysics(puck, board)
     expect(result.scored).toBeNull()
@@ -115,11 +115,11 @@ describe('stepPhysics — goal detection', () => {
   })
 })
 
-// A rink pocket variant of the base fixture — the plain `board` above (cornerRadius/
+// A rink pocket variant of the base fixture - the plain `board` above (cornerRadius/
 // behindGoalDepth both 0) has no pocket for a puck to end up behind, so the one-way door never
 // has anything to gate; AirHockey's own boards always carry a real pocket (see computeBoardLayout's
 // "unconditional" cornerRadius/behindGoalDepth), so this is the representative shape.
-describe('stepPhysics — rink pocket door', () => {
+describe('stepPhysics - rink pocket door', () => {
   const rinkBoard: BoardLayout = { ...board, cornerRadius: 40, behindGoalDepth: 60 }
 
   it("flags goalDoorHit: 'top' for a puck already behind the line bouncing off the door on its way back out", () => {
@@ -136,9 +136,9 @@ describe('stepPhysics — rink pocket door', () => {
     expect(result.goalDoorHit).toBe('bottom')
   })
 
-  it('does NOT flag goalDoorHit — and does not even bounce — approaching the front line outside the goal x-range', () => {
+  it('does NOT flag goalDoorHit - and does not even bounce - approaching the front line outside the goal x-range', () => {
     // Clear of both the top-corner quadrant (x < rinkBoard.x + cornerRadius) and the goal opening
-    // (goalAbsLeft..goalAbsRight) — the flat front wall only exists across the goal opening itself
+    // (goalAbsLeft..goalAbsRight) - the flat front wall only exists across the goal opening itself
     // now (see stepPhysicsOnce's own comment); outside it, the true boundary sits all the way out
     // at outerTop (board.y - behindGoalDepth), so this puck sails straight past the front line
     // toward the wider pocket wraparound with nothing stopping it at all.
@@ -149,9 +149,9 @@ describe('stepPhysics — rink pocket door', () => {
     expect(result.goalDoorHit).toBeNull()
   })
 
-  it('does not decay a puck already behind the line, off to the side of the goal mouth — friction is what would otherwise strand it there with no paddle able to follow', () => {
-    // Same off-to-the-side spot as the wraparound test above — outside the goal x-range, so
-    // neither the score check nor the one-way door ever see it — but this time already resting
+  it('does not decay a puck already behind the line, off to the side of the goal mouth - friction is what would otherwise strand it there with no paddle able to follow', () => {
+    // Same off-to-the-side spot as the wraparound test above - outside the goal x-range, so
+    // neither the score check nor the one-way door ever see it - but this time already resting
     // behind the front line rather than just crossing it, and moving purely sideways (parallel to
     // the line) so nothing else this step (wall/corner/post) touches its velocity either. A strong
     // friction coefficient makes any decay obvious if the exemption weren't working.
@@ -240,14 +240,14 @@ describe('applyPaddleCollision', () => {
     const puck = { x: -combined + 2, y: 0, vx: 5, vy: 0 }
     const paddle = { x: 0, y: 0, vx: 0, vy: 0 }
     const result = applyPaddleCollision(puck, paddle, paddle, puckRadius, paddleRadius)
-    // Normal points from paddle to puck, i.e. roughly (-1, 0) — puck's vx should reverse sign and
+    // Normal points from paddle to puck, i.e. roughly (-1, 0) - puck's vx should reverse sign and
     // scale by restitution, tangential vy stays 0.
     expect(result.vx).toBeLessThan(0)
     expect(Math.abs(result.vx)).toBeCloseTo(5 * PADDLE_COLLISION_RESTITUTION, 5)
     expect(result.vy).toBeCloseTo(0, 5)
   })
 
-  it('a moving paddle imparts its own velocity onto the puck — a resting puck gets launched by a fast paddle', () => {
+  it('a moving paddle imparts its own velocity onto the puck - a resting puck gets launched by a fast paddle', () => {
     const combined = puckRadius + paddleRadius
     const puck = { x: combined - 2, y: 0, vx: 0, vy: 0 }
     const slowPaddle = { x: 0, y: 0, vx: 8, vy: 0 }
@@ -258,7 +258,7 @@ describe('applyPaddleCollision', () => {
     expect(fastResult.vx).toBeGreaterThan(slowResult.vx) // a faster mallet hits harder
   })
 
-  it("never mutates the paddle's own position or velocity — the paddle stays 100% finger-controlled", () => {
+  it("never mutates the paddle's own position or velocity - the paddle stays 100% finger-controlled", () => {
     const combined = puckRadius + paddleRadius
     const puck = { x: combined - 2, y: 0, vx: -3, vy: 1 }
     const paddle = { x: 0, y: 0, vx: 12, vy: -4 }
@@ -279,7 +279,7 @@ describe('applyPaddleCollision', () => {
 
   it('a fast swipe clean past the puck (neither endpoint overlapping) still registers a strike', () => {
     // Paddle starts well clear on one side of the puck and ends well clear on the OTHER side,
-    // all within a single tick — a fast swipe, or a dropped frame's larger dt. Neither the start
+    // all within a single tick - a fast swipe, or a dropped frame's larger dt. Neither the start
     // nor the end position overlaps the puck, so only a swept check along the path actually
     // traveled catches this; a plain endpoint-only check would have missed it entirely (the
     // tunneling bug this test guards against).

@@ -40,7 +40,7 @@ describe('getGuideSteps', () => {
             expect(step.body.length).toBeLessThanOrEqual(90)
             // The pager sizes every page to the tallest, so a card without art leaves a visible gap.
             expect(step.art).toBeDefined()
-            expect(step.body).not.toMatch(/—/)
+            expect(step.body).not.toMatch(/\u2014/)
           }
         }
       }

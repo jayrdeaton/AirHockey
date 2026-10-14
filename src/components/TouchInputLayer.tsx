@@ -10,15 +10,15 @@ export interface TouchInputLayerProps {
   // their own input area (see the solo branch below) rather than a half of it.
   humanPlayers: Player[]
   enabled: boolean
-  // Local-space container size (see GoalSide's own doc comment in types/index.ts) — the SAME
+  // Local-space container size (see GoalSide's own doc comment in types/index.ts) - the SAME
   // local viewport BoardHost renders into, sized via computeLocalContainerSize in utils/board.ts.
   localWidth: number
   localHeight: number
   // The local container's own screen-space center (game.tsx's outer viewport is centered around
   // this same point, since the container is flex-centered within it) and the rotation game.tsx
-  // applies to it (0 for face-to-face, ±90 for side-by-side — see game.tsx's own rotation
+  // applies to it (0 for face-to-face, ±90 for side-by-side - see game.tsx's own rotation
   // direction comment). Needed to convert a touch's e.absoluteX/absoluteY (real screen position)
-  // back into local board coordinates by hand — see screenToLocal below for why this can't just
+  // back into local board coordinates by hand - see screenToLocal below for why this can't just
   // use a zone's own e.x/e.y.
   screenCenterX: number
   screenCenterY: number
@@ -29,7 +29,7 @@ export interface TouchInputLayerProps {
 
 // Converts a real screen-space touch position back into local board coordinates by hand, using
 // the exact inverse of the CSS rotation game.tsx applies to the local container for rendering.
-// This turned out to be necessary (not just defensive) — verified directly in the browser
+// This turned out to be necessary (not just defensive) - verified directly in the browser
 // preview: react-native-gesture-handler's web implementation reports a zone's own e.x/e.y as if
 // no rotation had been applied to any ancestor at all (a dragging test at a fixed screen-Y moved
 // the local coordinate along local-X, not local-Y, exactly the identity/no-rotation behavior),
@@ -58,22 +58,22 @@ function screenToLocal(absX: number, absY: number, screenCenterX: number, screen
 }
 
 // Two independent single-finger Pan gestures, each on its OWN View (top half = player 2, bottom
-// half = player 1 — always, regardless of GoalAxis: game.tsx rotates the whole local container
+// half = player 1 - always, regardless of GoalAxis: game.tsx rotates the whole local container
 // ±90° for side-by-side landscape, so this same top/bottom split always ends up on the correct
 // physical screen sides without this component ever branching on orientation itself for HIT-
-// TESTING — DOM/native hit-testing already respects the rotation transform when deciding which
+// TESTING - DOM/native hit-testing already respects the rotation transform when deciding which
 // zone a touch lands on, it's only the touch's own COORDINATE VALUE that needs the manual
-// correction above) — modeled directly on LightCycles' TouchInputLayer, which deliberately does
+// correction above) - modeled directly on LightCycles' TouchInputLayer, which deliberately does
 // NOT use one shared view split via `hitSlop`: two fingers landing in the same native touch batch
 // (a genuine simultaneous two-player touch, not two touches a few frames apart) raced on which
 // recognizer claimed which pointer on a single shared view, and lost one or both. Two separate
-// native views/recognizers have nothing left to race — each only ever sees the pointer that
+// native views/recognizers have nothing left to race - each only ever sees the pointer that
 // landed on it.
 export default function TouchInputLayer({ humanPlayers, enabled, localWidth, localHeight, screenCenterX, screenCenterY, rotationDeg, onPaddleTarget }: TouchInputLayerProps) {
   const solo = humanPlayers.length === 1
 
   // Everything the gesture callbacks need, kept in a ref rather than closed over directly, so the
-  // callbacks — and therefore the Gesture objects built from them below — stay referentially
+  // callbacks - and therefore the Gesture objects built from them below - stay referentially
   // stable across renders. See LightCycles' own TouchInputLayer for the original repro of what
   // goes wrong (dropped touches) when a Gesture object is rebuilt on every layout/state tick.
   const latestRef = useRef({ onPaddleTarget, localWidth, localHeight, screenCenterX, screenCenterY, rotationDeg })
@@ -103,10 +103,10 @@ export default function TouchInputLayer({ humanPlayers, enabled, localWidth, loc
     [enabled, handleTouch]
   )
 
-  // makePlayerGesture only *builds* a Gesture chain here — the ref read it closes over (via
+  // makePlayerGesture only *builds* a Gesture chain here - the ref read it closes over (via
   // handleTouch, inside .onStart/.onUpdate) doesn't run until an actual touch fires, never during
   // this useMemo call itself. The linter can't trace that far through the gesture-builder closure,
-  // so it conservatively flags calling it from render — same false-positive class Swirlio's
+  // so it conservatively flags calling it from render - same false-positive class Swirlio's
   // CLAUDE.md documents for this exact "ref read inside a gesture-builder callback" shape.
   /* eslint-disable react-hooks/refs */
   const soloGesture = useMemo(() => (solo ? makePlayerGesture(humanPlayers[0]) : null), [solo, humanPlayers, makePlayerGesture])
@@ -119,7 +119,7 @@ export default function TouchInputLayer({ humanPlayers, enabled, localWidth, loc
       <GestureDetector gesture={soloGesture!}>
         {/* collapsable={false}: without a prop that makes it stand out, RN's view-flattening
             optimization merges this plain View into its parent, and GestureDetector's ref then
-            attaches to nothing — the gesture silently never receives a single touch. */}
+            attaches to nothing - the gesture silently never receives a single touch. */}
         <View collapsable={false} style={[styles.zone, { width: localWidth, height: localHeight }]} />
       </GestureDetector>
     )

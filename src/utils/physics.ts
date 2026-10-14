@@ -7,7 +7,7 @@ export interface PhysicsResult extends PuckState {
   scored: 1 | 2 | null
   stopped: boolean
   bounced: boolean
-  // Set only when this step's bounce was against the invisible one-way door at the goal mouth —
+  // Set only when this step's bounce was against the invisible one-way door at the goal mouth -
   // see the door collision block below. Ported from BoxHockey unchanged: distinguishes a door hit
   // from every other kind of bounce (wall/post/corner) so Board.tsx can flash just that side, only
   // on that specific hit, instead of on every generic bounce.
@@ -24,10 +24,10 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
   const wasBehindBottom = puck.y - r > board.y + board.height
 
   // A puck already mid-crossing the front line at the START of this frame (leading edge already
-  // past board.y/board.y+height, trailing edge not yet — scoring requires FULL clearance, by
+  // past board.y/board.y+height, trailing edge not yet - scoring requires FULL clearance, by
   // design, so this is a real, reachable in-between state) skips friction this frame instead of
   // decaying normally. Without this, a puck that entered the goal mouth with only modest speed
-  // could decay below STOP_THRESHOLD before its trailing edge ever cleared the line — at which
+  // could decay below STOP_THRESHOLD before its trailing edge ever cleared the line - at which
   // point nothing else acts on it there either (the flat wall is deliberately disabled for the
   // whole corridor once centerInGoalX is true), so it would simply sit there forever: not scored
   // (body not fully through) and not bounced back out. Skipping friction (rather than merely
@@ -37,7 +37,7 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
 
   // A puck that's ALREADY fully behind a goal line gets the same exemption, for a related but
   // distinct reason: it can end up back there WITHOUT scoring by wrapping around a rounded outer
-  // corner instead of crossing through the goal mouth (see boardCornerQuadrant below) — off to the
+  // corner instead of crossing through the goal mouth (see boardCornerQuadrant below) - off to the
   // side of centerInGoalX entirely, where neither the score check nor the one-way door ever apply.
   // No paddle can ever follow it back there (clampToOwnHalf never lets one past board.y/board.y+
   // board.height), so friction decaying it to a stop would strand it, with nothing left to ever
@@ -58,21 +58,21 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
   y += vy * dt
 
   // Center-only, deliberately lenient (vs. a full-body-clearance test): "within the goal's own
-  // x-range" for every purpose that cares about it below — the flat-wall skip, the score check,
+  // x-range" for every purpose that cares about it below - the flat-wall skip, the score check,
   // the goalpost collision gate, and the rink pocket's one-way door.
   const centerInGoalX = x > goalAbsLeft && x < goalAbsRight
   let bounced = false
   let goalDoorHit: 'top' | 'bottom' | null = null
 
-  // A puck that has ALREADY fully cleared the line this frame — BEFORE any corner/goalpost/wall
-  // correction below ever touches it — is an unambiguous, already-complete score: return
+  // A puck that has ALREADY fully cleared the line this frame - BEFORE any corner/goalpost/wall
+  // correction below ever touches it - is an unambiguous, already-complete score: return
   // immediately rather than risk a goalpost correction nudging the position back and un-scoring a
   // puck that had already made it all the way through.
   if (centerInGoalX && y + r < board.y && !wasBehindTop) return { x, y, vx, vy, scored: 1, stopped: false, bounced: false, goalDoorHit: null }
   if (centerInGoalX && y - r > board.y + board.height && !wasBehindBottom) return { x, y, vx, vy, scored: 2, stopped: false, bounced: false, goalDoorHit: null }
 
   // Near one of the 4 rounded outer corners, a single concave arc check replaces BOTH the flat
-  // top/bottom and left/right wall checks below for this frame — this is also what opens the
+  // top/bottom and left/right wall checks below for this frame - this is also what opens the
   // wraparound path behind the goal, since within a corner's quadrant the flat front-wall check
   // (which would otherwise seal board.y everywhere outside the goal gap) simply doesn't run.
   const corner = boardCornerQuadrant(x, y, board)
@@ -92,7 +92,7 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
       bounced = true
     }
   } else {
-    // Checked BEFORE the flat wall below, and NOT gated on centerInGoalX at all — a post sits
+    // Checked BEFORE the flat wall below, and NOT gated on centerInGoalX at all - a post sits
     // EXACTLY at the corridor's own boundary, so circleVsCircle's own distance test is what
     // should decide this, not a same-threshold x-only proxy for it.
     let postHit = false
@@ -141,12 +141,12 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
     }
   }
 
-  // A one-way door at the goal mouth. Open front-to-back — entering (whether it scores on a
-  // fresh crossing or continues past into the pocket) is always unobstructed — but solid
+  // A one-way door at the goal mouth. Open front-to-back - entering (whether it scores on a
+  // fresh crossing or continues past into the pocket) is always unobstructed - but solid
   // back-to-front within the goal's own x-range specifically: a puck that's already behind the
   // line and drifts into the goal's x-range (e.g. wandering over from the wider pocket via a
   // corner) can't just pass back out through the same slot it would otherwise score through.
-  // Clamped a hair past the exact line (not flush to it) — landing exactly at y0+r === board.y
+  // Clamped a hair past the exact line (not flush to it) - landing exactly at y0+r === board.y
   // would make wasBehindTop's own strict "<" comparison false on the VERY NEXT step, which let a
   // puck that just bounced off this door immediately satisfy the score condition's !wasBehindTop
   // check while still moving in the wrong direction.
@@ -183,7 +183,7 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
     }
   }
 
-  // Always empty (an open rink has no center divider) — kept so a future variant could add
+  // Always empty (an open rink has no center divider) - kept so a future variant could add
   // obstacles without touching this loop, at zero runtime cost today.
   for (const obs of board.obstacles) {
     const col = circleVsRect({ position: { x, y }, radius: r }, obs)
@@ -202,7 +202,7 @@ function stepPhysicsOnce(puck: PuckState, board: BoardLayout, dt: number, fricti
 }
 
 // How far a single stepPhysicsOnce call is allowed to move the puck before sub-stepping kicks in
-// — tightened well below the smallest features these checks need to catch cleanly (a goalpost's
+// - tightened well below the smallest features these checks need to catch cleanly (a goalpost's
 // radius) rather than bounded by puckRadius itself, so a trajectory drifting almost exactly along
 // a goal-line boundary doesn't get sampled a hair on the wrong side of it. A fast paddle strike is
 // exactly the kind of large single-frame velocity change this protects against, so it's MORE
@@ -225,7 +225,7 @@ export function stepPhysics(puck: PuckState, board: BoardLayout, dt = 1, frictio
     const result = stepPhysicsOnce(current, board, subDt, friction)
     anyBounced = anyBounced || result.bounced
     lastGoalDoorHit = result.goalDoorHit ?? lastGoalDoorHit
-    // A score or a stop is final — stop sub-stepping immediately rather than continuing to
+    // A score or a stop is final - stop sub-stepping immediately rather than continuing to
     // integrate a puck that's already been removed from play (or come to rest) this frame.
     if (result.scored !== null || result.stopped) return { ...result, bounced: anyBounced, goalDoorHit: lastGoalDoorHit }
     current = { x: result.x, y: result.y, vx: result.vx, vy: result.vy }
@@ -234,7 +234,7 @@ export function stepPhysics(puck: PuckState, board: BoardLayout, dt = 1, frictio
 }
 
 // A paddle's velocity, for collision purposes, is derived from how far its committed position
-// moved THIS tick divided by dt — not from a gesture's own cumulative translation delta (which is
+// moved THIS tick divided by dt - not from a gesture's own cumulative translation delta (which is
 // relative to touch-down, not per-frame). Called once per player per physics tick (see
 // useGameState.ts's TICK handler); the caller is expected to smooth this over a few ticks (see
 // PADDLE_VELOCITY_SMOOTHING_FRAMES) before using it, so a single jittery touch sample doesn't
@@ -251,10 +251,10 @@ export function clampPaddleSpeed(vx: number, vy: number, maxSpeed: number = MAX_
   return { vx: vx * scale, vy: vy * scale }
 }
 
-// Segment-vs-circle sweep — the FALLBACK path applyPaddleCollision below reaches for only when a
+// Segment-vs-circle sweep - the FALLBACK path applyPaddleCollision below reaches for only when a
 // plain endpoint check (puck vs. the paddle's position THIS tick) finds no overlap. A paddle's
 // committed position can jump from p0 (last tick) to p1 (this tick) by more than a combined radius
-// in a single tick — a fast swipe, or just a dropped frame's larger dt — clean over the puck
+// in a single tick - a fast swipe, or just a dropped frame's larger dt - clean over the puck
 // without either endpoint ever overlapping it. Closed-form line-circle intersection (quadratic in
 // t along the p0->p1 parametrization) rather than sampling, same as every other shape check in this
 // file solves its geometry exactly instead of approximating it. Returns the paddle's own position
@@ -264,7 +264,7 @@ function sweptCircleFirstContact(p0: { x: number; y: number }, p1: { x: number; 
   const dx = p1.x - p0.x
   const dy = p1.y - p0.y
   const a = dx * dx + dy * dy
-  if (a < 0.0001) return null // paddle didn't move this tick — no path to sweep
+  if (a < 0.0001) return null // paddle didn't move this tick - no path to sweep
 
   const fx = p0.x - center.x
   const fy = p0.y - center.y
@@ -283,15 +283,15 @@ function sweptCircleFirstContact(p0: { x: number; y: number }, p1: { x: number; 
   return { x: p0.x + dx * t, y: p0.y + dy * t }
 }
 
-// Live paddle-vs-puck collision — BoxHockey's paddle is purely decorative and never touches the
+// Live paddle-vs-puck collision - BoxHockey's paddle is purely decorative and never touches the
 // physics engine at all; this is the one genuinely new collision primitive AirHockey needs.
 //
 // The paddle is treated as INFINITE MASS: its own vx/vy are never read back out of this function
-// or modified by it — the live gesture in TouchInputLayer (or the AI) is the only thing that ever
+// or modified by it - the live gesture in TouchInputLayer (or the AI) is the only thing that ever
 // moves it, so a puck bouncing off it must never perturb next frame's finger-tracked position.
 // @tastic/physics's resolveCircleCollision was considered and rejected for this: it's a
 // SYMMETRIC, equal-mass exchange (verified by reading its source directly) that would also alter
-// the paddle's own velocity — exactly the corruption this function exists to avoid.
+// the paddle's own velocity - exactly the corruption this function exists to avoid.
 //
 // Instead this is the standard infinite-mass-vs-finite-mass elastic collision via a reference-
 // frame shift, built from two already-exported, already-tested @tastic/physics primitives and no
@@ -303,7 +303,7 @@ function sweptCircleFirstContact(p0: { x: number; y: number }, p1: { x: number; 
 // elastic wall bounce.
 //
 // `prevPaddle` is that same paddle's committed position from the START of this tick (before this
-// tick's commitPaddle call moved it to `paddle`) — see sweptCircleFirstContact above for why a
+// tick's commitPaddle call moved it to `paddle`) - see sweptCircleFirstContact above for why a
 // same-tick swept check, not just the two endpoints, is what actually catches a fast swipe.
 export function applyPaddleCollision(puck: PuckState, prevPaddle: PaddleState, paddle: PaddleState, puckRadius: number, paddleRadius: number, restitution: number = PADDLE_COLLISION_RESTITUTION): PuckState {
   const col = circleVsCircle({ position: { x: puck.x, y: puck.y }, radius: puckRadius }, { position: { x: paddle.x, y: paddle.y }, radius: paddleRadius })
@@ -319,7 +319,7 @@ export function applyPaddleCollision(puck: PuckState, prevPaddle: PaddleState, p
     const dy = puck.y - contact.y
     const dist = Math.hypot(dx, dy)
     // dist is combinedRadius by construction (that's the point on the path sweptCircleFirstContact
-    // solves for), modulo floating point — depth is correctly ~0 at this first instant of contact,
+    // solves for), modulo floating point - depth is correctly ~0 at this first instant of contact,
     // there's nothing yet to push the puck out of.
     normal = dist < 0.001 ? { x: 0, y: -1 } : { x: dx / dist, y: dy / dist }
     depth = 0

@@ -8,7 +8,7 @@ export { ACHIEVEMENT_TIER_COLORS } from '@tastic/achievements'
 const AI_DIFFICULTY_TIER: Record<AiDifficulty, AchievementTier> = { easy: 'bronze', medium: 'silver', hard: 'gold' }
 const AI_DIFFICULTY_LABEL: Record<AiDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' }
 
-// Three different predicates, not one value against three thresholds — hand-written, and with no
+// Three different predicates, not one value against three thresholds - hand-written, and with no
 // `progress`, since "40% of the way to beating Hard once" isn't a meaningful fraction.
 function beatCpuFamily(): AchievementDefinition[] {
   const titles: Record<AiDifficulty, string> = { easy: 'Warmed Up', medium: 'Contender', hard: 'Table Legend' }
@@ -24,7 +24,7 @@ function beatCpuFamily(): AchievementDefinition[] {
 
 export const ACHIEVEMENT_CATALOG: AchievementDefinition[] = [
   { id: 'first_game_played', title: 'Drop the Puck', description: 'Play your first match.', tier: 'bronze', icon: 'flag-checkered', isUnlocked: (stats) => getOverallTotals(stats).played >= 1 },
-  { id: 'first_ever_win', title: 'First Blood', description: 'Win a match — any match, any time.', tier: 'bronze', icon: 'star', isUnlocked: (stats) => getOverallTotals(stats).wins >= 1 },
+  { id: 'first_ever_win', title: 'First Blood', description: 'Win any match, any time.', tier: 'bronze', icon: 'star', isUnlocked: (stats) => getOverallTotals(stats).wins >= 1 },
   {
     id: 'flawless_debut',
     title: 'Natural',

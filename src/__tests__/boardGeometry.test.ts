@@ -20,7 +20,7 @@ const sizes: PuckSizeLevel[] = ['small', 'medium', 'large']
 
 describe('goal width always leaves GOAL_OPEN_FRACTION of open net around a centered paddle', () => {
   const paddleSizes: PaddleSizeLevel[] = ['small', 'medium', 'large']
-  // Every puckSize x paddleSize combination — paddleSize is an entirely independent setting (see
+  // Every puckSize x paddleSize combination - paddleSize is an entirely independent setting (see
   // LoadoutSharedControls), so this also guards the cross-combination cases (e.g. a small puck
   // with a large paddle) that the old puckSize-only GOAL_WIDTH_RATIO table couldn't see at all.
   for (const puckSize of sizes) {
@@ -28,7 +28,7 @@ describe('goal width always leaves GOAL_OPEN_FRACTION of open net around a cente
       it(`puckSize=${puckSize}, paddleSize=${paddleSize}`, () => {
         const board = computeBoardLayout(400, 900, insets, 'vertical', puckSize, paddleSize)
         // The span a single stationary, perfectly centered paddle blocks via circle-vs-circle
-        // contact — see GOAL_OPEN_FRACTION's own comment in constants/game.ts.
+        // contact - see GOAL_OPEN_FRACTION's own comment in constants/game.ts.
         const blockingSpan = (board.paddleRadius + board.puckRadius) * 2
         expect(board.goalWidth).toBeGreaterThan(blockingSpan)
         expect(board.goalWidth).toBeLessThan(board.width)
@@ -158,15 +158,15 @@ describe('desktop web letterboxing', () => {
   it('letterboxes to roughly TABLE_LONG_TO_SHORT_RATIO on wide desktop web viewports, for either axis', () => {
     // Geometry is always canonical LOCAL space (see GoalSide's doc comment in types/index.ts):
     // board.width is always the short axis and board.height always the long axis, for every
-    // goalAxis value — goalAxis only decides which real screen dimension feeds S vs. L, never
+    // goalAxis value - goalAxis only decides which real screen dimension feeds S vs. L, never
     // how the result's own width/height are labeled.
     //
     // Only approximate, not exact: TABLE_LONG_TO_SHORT_RATIO governs the OUTER letterboxed
     // container, but board.height is the inner PLAYING FIELD, already shrunk by the (always-on)
-    // goal pocket depth at each end — same "field is inner, container is outer" distinction
+    // goal pocket depth at each end - same "field is inner, container is outer" distinction
     // BoxHockey's own board.ts uses. A narrower letterboxed S makes that pocket a proportionally
     // bigger bite out of L, so the field's own ratio drifts further from 2:1 than the outer
-    // container did — real, expected, and already true of BoxHockey's identical formula whenever
+    // container did - real, expected, and already true of BoxHockey's identical formula whenever
     // its own (opt-in) rink pocket is combined with desktop letterboxing.
     require('react-native').Platform.OS = 'web'
     const axes: GoalAxis[] = ['vertical', 'horizontal']

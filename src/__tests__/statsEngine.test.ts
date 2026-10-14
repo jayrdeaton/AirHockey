@@ -15,7 +15,7 @@ function play(prev: StatsState, outcome: MatchOutcome, context: MatchContext = V
   return applyMatchOutcome(prev, outcome, context, now)
 }
 
-describe('applyMatchOutcome — vsCpu', () => {
+describe('applyMatchOutcome - vsCpu', () => {
   it('records a human win without touching twoPlayer', () => {
     const s = play(DEFAULT_STATS, win([7, 3]))
     expect(s.vsCpu).toMatchObject({ played: 1, wins: 1, losses: 0 })
@@ -44,7 +44,7 @@ describe('applyMatchOutcome — vsCpu', () => {
   })
 })
 
-describe('applyMatchOutcome — goals, shutouts and margins', () => {
+describe('applyMatchOutcome - goals, shutouts and margins', () => {
   it('accumulates goals for and against from seat 1s perspective', () => {
     let s = play(DEFAULT_STATS, win([7, 3]))
     s = play(s, win([2, 7]))
@@ -69,7 +69,7 @@ describe('applyMatchOutcome — goals, shutouts and margins', () => {
   })
 })
 
-describe('applyMatchOutcome — goal door', () => {
+describe('applyMatchOutcome - goal door', () => {
   it('accumulates goal-door hits across matches', () => {
     let s = play(DEFAULT_STATS, win([7, 3], 4))
     s = play(s, win([7, 1], 6))
@@ -83,7 +83,7 @@ describe('applyMatchOutcome — goal door', () => {
   })
 })
 
-describe('applyMatchOutcome — twoPlayer seats', () => {
+describe('applyMatchOutcome - twoPlayer seats', () => {
   it('records seat wins without touching vsCpu', () => {
     const s = play(DEFAULT_STATS, win([7, 5]), TWO_PLAYER)
     expect(s.twoPlayer).toEqual({ played: 1, p1Wins: 1, p2Wins: 0 })
@@ -96,7 +96,7 @@ describe('applyMatchOutcome — twoPlayer seats', () => {
   })
 })
 
-describe('applyMatchOutcome — profiles', () => {
+describe('applyMatchOutcome - profiles', () => {
   const withProfiles: MatchContext = { ...TWO_PLAYER, profileIds: { 1: 'alice', 2: 'bob' } }
 
   it('leaves profiles untouched when no ids are supplied', () => {

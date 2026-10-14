@@ -34,7 +34,7 @@ describe('TICK ordering', () => {
     const reducer = makeReducer(5, 0.986)
     const state = liveState()
     // Puck sits at center; player 1's paddle starts well below it and its target this tick moves
-    // straight up (purely vertical, same x as the puck) to just past overlap — an unambiguous
+    // straight up (purely vertical, same x as the puck) to just past overlap - an unambiguous
     // head-on approach along the collision normal, not a graze.
     const startY = board.centerY + board.puckRadius + board.paddleRadius + 40
     const targetY = board.centerY + board.puckRadius + board.paddleRadius - 5
@@ -47,8 +47,8 @@ describe('TICK ordering', () => {
     const reducer = makeReducer(5, 0.986)
     const state = liveState()
     // Player 1's paddle starts well to one side of the puck (which sits at center) and this
-    // tick's target jumps to well past the OTHER side — a fast swipe, or a dropped frame's larger
-    // dt — with neither position overlapping the puck. A plain start/end-of-tick check would see
+    // tick's target jumps to well past the OTHER side - a fast swipe, or a dropped frame's larger
+    // dt - with neither position overlapping the puck. A plain start/end-of-tick check would see
     // no contact at all; only a swept check along the path actually traveled catches it.
     const combined = board.puckRadius + board.paddleRadius
     const startX = board.centerX - combined * 3
@@ -72,7 +72,7 @@ describe('scoring and re-serve', () => {
     const reducer = makeReducer(5, 0.986)
     let state = liveState()
     const targets = { 1: state.paddles[1], 2: state.paddles[2] }
-    // A fast puck already at the goal mouth, heading in — scores within one tick.
+    // A fast puck already at the goal mouth, heading in - scores within one tick.
     state = { ...state, puck: { x: board.centerX, y: board.y + 2, vx: 0, vy: -30 } }
     const afterGoal = reducer(state, { type: 'TICK', board, dt: 1, targets })
     expect(afterGoal.phase).toBe('goalScored')
@@ -80,7 +80,7 @@ describe('scoring and re-serve', () => {
     expect(afterGoal.lastScoredGoal).toBe('top')
 
     // Player 1 scored (into player 2's local-top goal), so player 2 is the scored-on player and
-    // gets the restart — see GOAL_SERVE's own comment for why this isn't a neutral center serve.
+    // gets the restart - see GOAL_SERVE's own comment for why this isn't a neutral center serve.
     const expected = faceoffZoneCenter(board, 2, 0)
     const served = reducer(afterGoal, { type: 'GOAL_SERVE', board, zoneIndex: 0 })
     expect(served.phase).toBe('live')
@@ -135,7 +135,7 @@ describe('RESCALE', () => {
     const next = reducer(state, { type: 'RESCALE', prevBoard: board, board: doubled })
     expect(next.phase).toBe('live')
     expect(next.scores).toEqual([2, 1])
-    // Puck started dead center (fraction 0.5, 0.5 of the field) — should still be dead center of
+    // Puck started dead center (fraction 0.5, 0.5 of the field) - should still be dead center of
     // the new, larger board.
     expect(next.puck.x).toBeCloseTo(doubled.centerX, 5)
     expect(next.puck.y).toBeCloseTo(doubled.centerY, 5)
