@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // On by default - see its own doc comment on Settings.
   rink: true,
   deferBottomEdgeGestures: false,
+  keepAwake: true,
   // Asymmetric defaults (not both 'mouse') so two seats sharing one desktop's keyboard/mouse don't
   // start out colliding - mirrors Snake's/Pong's identical reasoning for the same field.
   controlScheme: { 1: 'mouse', 2: 'wasd' }

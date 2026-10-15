@@ -2,7 +2,7 @@ import { defaultColors, getThirdColor, useAutoPaperTheme, useThemeSettings } fro
 import { FakeLandscapeView, getViewRotation, rotateInsets, useOrientationState } from '@tastic/core'
 import { ControlSchemePicker, CornerActionButtons, getColorPopoverId, getCpuDifficultyPopoverId, getInlineColorPickerContentSize, getLabeledDropdownContentHeight, LABELED_DROPDOWN_POPOVER_WIDTH, MenuOption, PlayerSetupPanel, PressAwayOverlay, ReadyButton, SharedActionBand, usePopoverHost, useZoneClampedAlign } from '@tastic/hud'
 import { assignSeatScheme } from '@tastic/input'
-import { Profile } from '@tastic/profile'
+import { avoidSeatColorClash, Profile } from '@tastic/profile'
 import { DualZoneLayout, needsSharedNeutralZone, useDualZoneLayout } from '@tastic/split-screen'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -13,6 +13,7 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import { LOADOUT_SHARED_CONTROLS_IDS, LoadoutSharedControls } from '@/components/LoadoutSharedControls'
 import { SettingsDialog } from '@/components/SettingsDialog'
+import { DEFAULT_P1_COLOR, DEFAULT_P2_COLOR } from '@/constants/game'
 import { useProfiles } from '@/hooks/useProfiles'
 import { useSettings } from '@/hooks/useSettings'
 import { liveplayActions } from '@/redux/liveplaySlice'
@@ -28,6 +29,10 @@ import { safeBack } from '@/utils/navigation'
 // that file is owned by the physics/board work happening elsewhere in this build - kept local here
 // instead of adding to it, same 180ms BoxHockey itself uses for this exact fade.
 const PANEL_SWAP_FADE_MS = 180
+
+// What @tastic/profile's avoidSeatColorClash moves seat 2 to when both seats land on one color: a
+// profile picked for one seat can be saved as the other seat's color, with no swap step behind it.
+const SEAT_DEFAULT_COLORS = [DEFAULT_P1_COLOR, DEFAULT_P2_COLOR] as const
 
 // The rink toggle's single option, same as BoxHockey's RINK_OPTION: presence in a one-item
 // multi-select's value array already means "on," so there's nothing an "off" row would add beyond
@@ -198,7 +203,7 @@ export default function LoadoutScreen() {
   // it already applied (harmless, idempotent).
   useEffect(() => {
     const nextP1 = p1Profile ? (profileOverride[1] ?? p1Profile.color) : guestColors[1]
-    const nextP2 = !p2IsHuman ? cpuColor : p2Profile ? (profileOverride[2] ?? p2Profile.color) : guestColors[2]
+    const nextP2 = avoidSeatColorClash(nextP1, !p2IsHuman ? cpuColor : p2Profile ? (profileOverride[2] ?? p2Profile.color) : guestColors[2], SEAT_DEFAULT_COLORS)
     setThemeColor({ color: { primary: nextP1, secondary: nextP2, tertiary: getThirdColor(nextP1, nextP2) } })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSelected[1], lastSelected[2], p2IsHuman, guestColors, cpuColor, profileOverride])
@@ -224,7 +229,7 @@ export default function LoadoutScreen() {
       const cpu = cpuColorRef.current
       const override = profileOverrideRef.current
       const nextP1 = p1Prof ? (override[1] ?? p1Prof.color) : guest[1]
-      const nextP2 = !p2IsHuman ? cpu : p2Prof ? (override[2] ?? p2Prof.color) : guest[2]
+      const nextP2 = avoidSeatColorClash(nextP1, !p2IsHuman ? cpu : p2Prof ? (override[2] ?? p2Prof.color) : guest[2], SEAT_DEFAULT_COLORS)
       setThemeColor({ color: { primary: nextP1, secondary: nextP2, tertiary: getThirdColor(nextP1, nextP2) } })
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lastSelected[1], lastSelected[2], p2IsHuman, setThemeColor])
@@ -288,21 +293,32 @@ export default function LoadoutScreen() {
   // fresh pick from a reselect apart from `selectedProfileId` alone, and by the time it would call
   // back up here the seat's own profile/guest/CPU state (p1Profile et al.) is still this render's
   // stale snapshot, not the one selectProfile is about to commit.
+  // Picking the other seat's profile swaps the two (see @tastic/profile's select), so the other
+  // seat's override is cleared too: its profile changes without its own handler running. The
+  // reactive effect above then re-resolves both seats.
   const handleP1ProfileSelect = useCallback(
     (profile: Profile | null) => {
       dispatch(seatColorsActions.setProfileOverride({ seat: 1, color: null }))
+      if (profile && profile.id === lastSelected[2]) dispatch(seatColorsActions.setProfileOverride({ seat: 2, color: null }))
       selectProfile(1, profile?.id ?? null)
-      if (profile) setThemeColor({ color: { primary: profile.color, secondary: p2Color, tertiary: getThirdColor(profile.color, p2Color) } })
+      if (profile) {
+        const secondary = avoidSeatColorClash(profile.color, p2Color, SEAT_DEFAULT_COLORS)
+        setThemeColor({ color: { primary: profile.color, secondary, tertiary: getThirdColor(profile.color, secondary) } })
+      }
     },
-    [dispatch, selectProfile, setThemeColor, p2Color]
+    [dispatch, lastSelected, selectProfile, setThemeColor, p2Color]
   )
   const handleP2ProfileSelect = useCallback(
     (profile: Profile | null) => {
       dispatch(seatColorsActions.setProfileOverride({ seat: 2, color: null }))
+      if (profile && profile.id === lastSelected[1]) dispatch(seatColorsActions.setProfileOverride({ seat: 1, color: null }))
       selectProfile(2, profile?.id ?? null)
-      if (profile) setThemeColor({ color: { primary: p1Color, secondary: profile.color, tertiary: getThirdColor(p1Color, profile.color) } })
+      if (profile) {
+        const secondary = avoidSeatColorClash(p1Color, profile.color, SEAT_DEFAULT_COLORS)
+        setThemeColor({ color: { primary: p1Color, secondary, tertiary: getThirdColor(p1Color, secondary) } })
+      }
     },
-    [dispatch, selectProfile, setThemeColor, p1Color]
+    [dispatch, lastSelected, selectProfile, setThemeColor, p1Color]
   )
 
   // Covers exactly the fields LoadoutSharedControls itself exposes - puck/paddle physics, score to

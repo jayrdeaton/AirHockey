@@ -3,9 +3,9 @@ import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
-import { AchievementUnlockList, type AchievementUnlockOwner, ConfirmDialog, useQuitConfirmation } from '@tastic/hud'
+import { AchievementUnlockList, type AchievementUnlockOwner, ConfirmDialog, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { Profile } from '@tastic/profile'
-import { StatusBar } from 'expo-status-bar'
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
@@ -150,11 +150,26 @@ export default function GameScreen() {
   // still reads whatever `scores` is bound to at the time the closure itself is (re)created each
   // render, same as a hand-rolled onBackPress body always did before this hook existed.
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => scores[0] > 0 || scores[1] > 0, safeBack)
+  // Once the match is over (gameOver) its stats are already recorded and nothing is lost, so back
+  // exits at once, the same as the Game Over card's own buttons.
+  const { confirmVisible, requestBack, cancelBack } = useQuitConfirmation(() => phase !== 'gameOver' && (scores[0] > 0 || scores[1] > 0), safeBack)
   // Leaving the app mid-match (home, app switch, a phone call, Control Center) latches a pause that
   // only the Paused dialog's Resume clears - see @tastic/core's useBackgroundPause. Skipped once the
   // match is over, or while a dialog already holds the pause by itself.
   const { backgroundPaused, resume } = useBackgroundPause(() => phase !== 'gameOver' && !settingsOpen && !confirmVisible)
+  // Keeps the screen from dimming and locking while a match is up, unless Keep Awake is off in
+  // Settings (read live, so the toggle applies mid-match). Expo only does this by itself in
+  // development builds, and the OS auto-lock only counts screen touches, so tilt or keyboard steering,
+  // or watching the CPU, could let a release build lock mid-match. Failures are dropped: a browser
+  // without the Screen Wake Lock API (or one that refuses it) just keeps its own timeout.
+  const keepAwake = useSelector((state: RootState) => state.settings.keepAwake)
+  useEffect(() => {
+    if (!keepAwake) return undefined
+    activateKeepAwakeAsync('game').catch(() => {})
+    return () => {
+      deactivateKeepAwake('game').catch(() => {})
+    }
+  }, [keepAwake])
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
   // Two-player (pass-and-play) only - seat -> that seat's own newly-unlocked achievements this
@@ -192,9 +207,9 @@ export default function GameScreen() {
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
   const fg = dark ? '#FFFFFF' : '#000000'
-  const fgMuted = dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)'
-  const cardBg = dark ? '#111111' : '#F2F2F2'
-  const cardBorder = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'
+  // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
+  // takes its theme colors rather than this screen's literal black/white.
+  const { fg: cardFg, fgMuted } = useOverlayCardColors()
 
   const playerColor: Record<Player, string> = { 1: themeColors.primary, 2: themeColors.secondary }
   const playerOnColor: Record<Player, string> = { 1: themeColors.onPrimary, 2: themeColors.onSecondary }
@@ -295,6 +310,15 @@ export default function GameScreen() {
   const backPos = localToScreen(board.x + buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
   const settingsPos = localToScreen(board.x + board.width - buttonMargin, buttonY, localSize.width, localSize.height, screenCenterX, screenCenterY, rotationDeg)
   const rotationStyle = rotationDeg !== 0 ? { transform: [{ rotate: `${rotationDeg}deg` }] } : undefined
+  // Desktop web turns the rink a quarter turn to fit a wide window, but the page itself is always
+  // read upright there, so the back/settings chips, the Game Over card and the dialogs stay upright
+  // too rather than turning with it. The chips also leave the rink for the page's own top corners,
+  // the same spot as hud's CornerActionButtons on every other screen; following the rink would carry
+  // them down the page's left edge.
+  const overlayRotationDeg = isDesktopWeb ? 0 : rotationDeg
+  const overlayRotationStyle = isDesktopWeb ? undefined : rotationStyle
+  const backSlot = isDesktopWeb ? { top: 8 + insets.top, left: 8 + insets.left } : { left: backPos.x - 24, top: backPos.y - 24 }
+  const settingsSlot = isDesktopWeb ? { top: 8 + insets.top, right: 8 + insets.right } : { left: settingsPos.x - 24, top: settingsPos.y - 24 }
 
   const progressMessage = (
     <>
@@ -305,8 +329,6 @@ export default function GameScreen() {
   )
   return (
     <View style={[styles.root, { backgroundColor: bg }]}>
-      <StatusBar hidden />
-
       {/* Local-space board + input area - sized to localSize (the container BEFORE rotation,
           covering the whole screen so the rink pocket can reach into the safe-area insets; the
           board geometry keeps the playing field itself inside them), centered on the screen,
@@ -344,10 +366,10 @@ export default function GameScreen() {
 
       {/* Game Over overlay - card rotates as a unit via rotationDeg so it reads upright whichever
           way the board itself is currently rotated (see rotationStyle above), matching Pong's own
-          overlayCard treatment; previously left unrotated. */}
+          Game Over card; previously left unrotated. Upright on desktop web (see overlayRotationDeg). */}
       {phase === 'gameOver' && (
-        <View style={styles.overlay}>
-          <View style={[styles.overlayCard, { backgroundColor: cardBg, borderColor: cardBorder }, rotationStyle]}>
+        <OverlayBackdrop>
+          <OverlayCard style={overlayRotationStyle}>
             <Icon source='trophy' size={64} color={playerColor[winner]} />
             <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[winner], fontFamily: MONO_FONT }]}>
               Wins!
@@ -361,26 +383,27 @@ export default function GameScreen() {
             here instead of the shared showAchievementToast vsCpu still uses. This card already
             carries a single shared rotationStyle, so each row's owner avatar is what identifies
             whose achievement it is, not a second independent rotation. */}
-            {aiPlayer === null && <AchievementUnlockList unlocks={seatUnlocks} seats={SEATS} owners={achievementOwners} tierColors={ACHIEVEMENT_TIER_COLORS} fg={fg} />}
+            {aiPlayer === null && <AchievementUnlockList unlocks={seatUnlocks} seats={SEATS} owners={achievementOwners} tierColors={ACHIEVEMENT_TIER_COLORS} fg={cardFg} />}
             <Button mode='contained' onPress={() => resetGame(board)} style={styles.overlayButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
               Play Again
             </Button>
             <Button mode='contained' onPress={safeBack} style={styles.overlayButton} buttonColor={playerColor[winner]} textColor={playerOnColor[winner]}>
               Quit
             </Button>
-          </View>
-        </View>
+          </OverlayCard>
+        </OverlayBackdrop>
       )}
 
       {/* Quit confirmation - now the fleet-shared @tastic/hud ConfirmDialog rather than a hand-
-      rolled overlay. rotation={rotationDeg} is the same physical-hold-compensating rotation the
-      board/other floating UI use (see rotationDeg's own comment above), not a fresh computation.
+      rolled overlay. Its rotation is the same physical-hold-compensating rotation the board/other
+      floating UI use (see rotationDeg's own comment above), not a fresh computation, except that
+      desktop web keeps it upright (see overlayRotationDeg).
       Trades this dialog's previous secondary-accent Quit button and MONO_FONT styling for the
       shared component's primary accent and default font - an accepted trade-off. */}
-      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} rotation={rotationDeg} />
+      <ConfirmDialog visible={confirmVisible} title='Quit Match?' message={progressMessage} confirmLabel='Quit' cancelLabel='Cancel' icon='alert-circle-outline' destructive={false} onConfirm={safeBack} onCancel={cancelBack} rotation={overlayRotationDeg} />
       {/* Shown when the app comes back from the background mid-match (see useBackgroundPause above):
       play stays frozen until Resume, so a match never restarts before the player is back and ready. */}
-      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={rotationDeg} />
+      <ConfirmDialog visible={backgroundPaused} title='Paused' message={progressMessage} confirmLabel='Resume' cancelLabel='Quit' icon='pause-circle-outline' destructive={false} onConfirm={resume} onCancel={safeBack} rotation={overlayRotationDeg} />
 
       {/* Back + settings - anchored to the board's own top corners in LOCAL space (board.x/y), then
           mapped to a real screen position via localToScreen using the SAME rotationDeg the board's
@@ -393,19 +416,20 @@ export default function GameScreen() {
           legible. Unlike BoxHockey's centerline placement (needed there because its board splits
           face-to-face with P2's half rotated 180°), AirHockey's board is never rotated PER PLAYER -
           only as a single unit for goalAxis - so one shared, non-neutral corner pair is still
-          correct; it just has to move and rotate with that unit rotation instead of ignoring it. */}
-      <View style={[styles.backButton, { left: backPos.x - 24, top: backPos.y - 24 }]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={requestBack} />
+          correct; it just has to move and rotate with that unit rotation instead of ignoring it.
+          Desktop web is the exception: the page's own top corners, upright (see overlayRotationDeg above). */}
+      <View style={[styles.backButton, backSlot]}>
+        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={requestBack} />
       </View>
-      <View style={[styles.settingsButton, { left: settingsPos.x - 24, top: settingsPos.y - 24 }]}>
-        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, rotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
+      <View style={[styles.settingsButton, settingsSlot]}>
+        <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
       </View>
 
-      {/* rotation={rotationDeg} - same physical-hold-compensating rotation the board itself uses
-      (see rotationDeg's own comment above), not a separate reading; previously omitted entirely,
+      {/* Same physical-hold-compensating rotation the board itself uses (see rotationDeg's own
+      comment above, and overlayRotationDeg for desktop web), not a separate reading; previously omitted entirely,
       leaving this dialog's content stuck unrotated in the 'horizontal' goalAxis orientation while
       index.tsx/loadout.tsx's own dialogs correctly rotated. */}
-      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} rotation={rotationDeg} settings={settings} setSettings={setSettings} />
+      <SettingsDialog visible={settingsOpen} onDismiss={() => setSettingsOpen(false)} rotation={overlayRotationDeg} settings={settings} setSettings={setSettings} />
     </View>
   )
 }
@@ -419,24 +443,7 @@ const styles = StyleSheet.create({
   // (0,0) instead, which is what silently put the whole board off-center before this was caught
   // in the browser preview).
   localContainer: {},
-  overlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    bottom: 0,
-    justifyContent: 'center',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0
-  },
   overlayButton: { width: 160 },
-  overlayCard: {
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 16,
-    padding: 32
-  },
   overlayScore: {},
   overlayTitle: { fontWeight: 'bold' },
   root: { flex: 1 },
