@@ -419,7 +419,7 @@ export default function GameScreen() {
           correct; it just has to move and rotate with that unit rotation instead of ignoring it.
           Desktop web is the exception: the page's own top corners, upright (see overlayRotationDeg above). */}
       <View style={[styles.backButton, backSlot]}>
-        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={requestBack} />
+        <IconButton icon='arrow-left' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={requestBack} accessibilityLabel='Back' />
       </View>
       <View style={[styles.settingsButton, settingsSlot]}>
         <IconButton icon='cog' iconColor={bg} containerColor={fg} style={[styles.chipButton, overlayRotationStyle]} size={24} onPress={() => setSettingsOpen(true)} accessibilityLabel='Settings' />
