@@ -2,7 +2,7 @@ import { callWorkletCallback, useWorkletCallback } from '@rific/core'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import { runOnJS } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { Player } from '@/types'
 
@@ -88,8 +88,8 @@ export default function TouchInputLayer({ humanPlayers, enabled, localWidth, loc
     onPaddleTarget(player, local.x, local.y)
   }, [])
 
-  // The worklets below call handleTouch through a key and the module-level callWorkletCallback, never runOnJS(handleTouch)
-  // directly: native code holds a runOnJS target for as long as the gesture's cached worklet lives, which would pin this
+  // The worklets below call handleTouch through a key and the module-level callWorkletCallback, never scheduleOnRN(handleTouch)
+  // directly: native code holds a scheduleOnRN target for as long as the gesture's cached worklet lives, which would pin this
   // component in memory forever.
   const touchKey = useWorkletCallback(handleTouch)
 
@@ -101,10 +101,10 @@ export default function TouchInputLayer({ humanPlayers, enabled, localWidth, loc
         .hitSlop({})
         .enabled(enabled)
         .onStart((e) => {
-          runOnJS(callWorkletCallback)(touchKey, player, e.absoluteX, e.absoluteY)
+          scheduleOnRN(callWorkletCallback, touchKey, player, e.absoluteX, e.absoluteY)
         })
         .onUpdate((e) => {
-          runOnJS(callWorkletCallback)(touchKey, player, e.absoluteX, e.absoluteY)
+          scheduleOnRN(callWorkletCallback, touchKey, player, e.absoluteX, e.absoluteY)
         }),
     [enabled, touchKey]
   )
