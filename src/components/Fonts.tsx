@@ -3,6 +3,7 @@ import Constants from 'expo-constants'
 import { useFonts } from 'expo-font'
 import Head from 'expo-router/head'
 import { ReactNode } from 'react'
+import { Platform } from 'react-native'
 
 import { SplashGate } from '@/utils/splashGate'
 
@@ -24,10 +25,12 @@ export function Fonts({ children }: Props) {
   const [loaded, error] = useFonts({ ...MaterialCommunityIcons.font })
   return (
     <>
-      {/* The web tab title, outside the gate so the static export's HTML has it too (fonts never load there) */}
-      <Head>
-        <title>{Constants.expoConfig?.name}</title>
-      </Head>
+      {/* The web tab title, outside the gate so the static export's HTML has it too (fonts never load there). Web only: on iOS, expo-router's Head is Handoff/Spotlight metadata that needs the plugin's `origin` set, and without it every route change throws (a dev build) or shows a system alert (a production build) */}
+      {Platform.OS === 'web' && (
+        <Head>
+          <title>{Constants.expoConfig?.name}</title>
+        </Head>
+      )}
       <SplashGate gate='fonts' ready={loaded || !!error}>
         {children}
       </SplashGate>

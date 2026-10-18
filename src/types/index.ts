@@ -68,10 +68,6 @@ export interface Settings {
   // eating a "swipe twice to go home" surprise from day one. Mirrored into native UserDefaults (see
   // Providers.tsx's EdgeGuardBridge) for @tastic/edge-guard's own config plugin swizzle to read at runtime.
   deferBottomEdgeGestures: boolean
-  // Keep Awake (Settings dialog): keeps the screen from dimming and locking while /game is up (see
-  // game.tsx). On by default, unlike Edge Guard: a screen that locks mid-match hits every player,
-  // not just the few who'd go looking for a fix.
-  keepAwake: boolean
   // Web-only per-seat picker (see PlayerSetupPanel's ControlSchemePicker usage) - which physical
   // input drives each seat's paddle. 'mouse' (the default) keeps using TouchInputLayer's own drag
   // input unchanged; any KeyScheme routes that seat's paddle through KeyboardInputLayer instead.

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { combineReducers, configureStore, type Middleware } from '@reduxjs/toolkit'
 import { createThemeReducer, getThirdColor } from '@rific/auto-paper'
+import { keepAwakeReducer } from '@rific/core'
 import { defaultSoundSettings, hapticReducer, soundReducer, type SoundSettings } from '@rific/feedback-press'
 import { createReturningPlayerMigrate } from '@tastic/hud/guide'
 import { profilesReducer } from '@tastic/profile'
@@ -46,6 +47,9 @@ const rootReducer = combineReducers({
   theme: themeReducer,
   haptic: hapticReducer,
   sound: appSoundReducer,
+  // @rific/core's Keep Awake setting (see Providers.tsx's KeepAwakeBridge), under the namespace its
+  // REHYDRATE handling expects.
+  keepAwake: keepAwakeReducer,
   // The shared App Group roster (see @tastic/profile's resolveInitialProfiles/
   // useSharedProfilesSync, wired in hooks/useProfiles.tsx) is layered on top of this as a separate
   // sync target - this slice persisting normally via redux-persist, same as every other key here,
