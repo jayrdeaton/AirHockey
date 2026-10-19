@@ -4,16 +4,16 @@ This file provides guidance to Claude Code when working in this repository.
 
 # AirHockey
 
-A digital AirHockey game (Expo/React Native, Skia-rendered). Part of the `@rific`/`@tastic`/InfiniteToken app ecosystem - depends on `@rific/auto-paper`, `@rific/feedback-press`, `@rific/splash-gate`, `@rific/toaster`, `@rific/updater`, `@tastic/achievements`, `@tastic/core`, `@tastic/edge-guard`, `@tastic/hud`, `@tastic/input`, `@tastic/physics`, `@tastic/profile`, `@tastic/split-screen`, `@tastic/sprites`.
+A digital AirHockey game (Expo/React Native, Skia-rendered). Part of the `@rific`/`@tastic`/InfiniteToken app ecosystem - depends on `@rific/auto-paper`, `@rific/feedback-press`, `@rific/gestures`, `@rific/splash-gate`, `@rific/toaster`, `@rific/updater`, `@tastic/achievements`, `@tastic/core`, `@tastic/edge-guard`, `@tastic/hud`, `@tastic/input`, `@tastic/physics`, `@tastic/profile`, `@tastic/split-screen`, `@tastic/sprites`.
 
-**Expo has changed.** Read the exact versioned docs at https://docs.expo.dev/versions/v57.0.0/ before writing any code - don't rely on general Expo knowledge, this app is on SDK 57 specifically.
+**Expo has changed.** Read the exact versioned docs at https://docs.expo.dev/versions/v58.0.0/ before writing any code - don't rely on general Expo knowledge, this app is on SDK 58 specifically.
 
 ## Commands
 
 ```bash
 npm run lint          # expo lint .
 npm run fix            # expo lint . --fix
-npm test               # Jest (13 suites, 166 tests)
+npm test               # Jest (14 suites, 170 tests)
 npm run test:watch     # Jest --watchAll
 npm run typecheck      # tsc
 npm run verify         # lint + test + typecheck
@@ -222,7 +222,7 @@ On desktop web (web, window at least `DESKTOP_WEB_MIN_WIDTH` = 768 wide, the fle
 
 - **The setting is core's, not this app's** (2026-10-17, when Keep Awake moved upstream): `@rific/core`'s `keepAwakeReducer` is mounted as `keepAwake` in `store.ts` (persisted like every key but `liveplay`; core's slice handles its own REHYDRATE under that namespace), and `Providers.tsx`'s `KeepAwakeBridge` (FeedbackBridge's shape: `initialValue` from the slice, `onChange` dispatching `keepAwakeActions.initialize`) mounts core's `KeepAwakeProvider` with `expoKeepAwake={ExpoKeepAwake}` (`import * as ExpoKeepAwake from 'expo-keep-awake'`). Handing it the module is what turns the feature on: without it `useKeepAwake` does nothing and hud hides the row. `useKeepAwake` drops both expo-keep-awake rejections (web refuses a wake lock in a frame without the Permissions-Policy, and rejects a release when none is held). The old `settings.keepAwake` field, its default and the hand-rolled `/game` effect are gone, and the value saved under it was abandoned (no migration: the games aren't on the App Store), so a player who had turned it off starts back on.
 - The row is `@tastic/hud`'s (0.23.0+): `BaseSettingsDialog` reads core's setting itself, with no props, and shows the row (caption "Stop auto-lock mid-match") only when `useExpoKeepAwake()` returns a module and the device is touch-first (native and touch-first browsers), like Lock Orientation. Needs `@rific/core` 0.4.0+.
-- `expo-keep-awake` was already installed as a dependency of `expo`, so it is already in existing native builds; it's a direct dependency (`~57.0.2`). No new native build needed.
+- `expo-keep-awake` was already installed as a dependency of `expo`, so it is already in existing native builds; it's a direct dependency (`~58.0.3`). No new native build needed.
 - Same in AirHockey, BoxHockey, LightCycles, Pong and Snake (the four with the shared `Providers.tsx` have the same `KeepAwakeBridge` byte for byte; Snake's sits next to its ScrollViewBridge), and in ArcheryDuel, Hangman, HexFleet and Solitaire. Checked on web (2026-10-15, the per-game version before core): `/game` took the wake lock on mount and released it on exit, took none with the setting off, and the toggle took or released it mid-match; the row showed on a touch device and hid on desktop. Not checked on a device yet: a release build staying lit through a long rally.
 
 ## Status bar: per-screen options (2026-10-15)
@@ -235,9 +235,9 @@ Why: an app linked against the iOS 27 SDK (Xcode 27) can't set the status bar th
 - **It needs a new native build.** `UIViewControllerBasedStatusBarAppearance` only reaches Info.plist at prebuild, and the app.json plugin list changed too, so the fingerprint runtime version moves on: an OTA update from here on won't reach an older binary.
 - Android gets the same options from react-native-screens (no Info.plist key there). Not checked on a device on either platform.
 
-## Xcode 26 image pin (remove on Expo SDK 58)
+## Expo SDK 58 (2026-10-18)
 
-`eas.json` pins the `preview` and `production` iOS builds to `macos-tahoe-26.5-xcode-26.6` (set fleet-wide 2026-10-14). An app linked against the iOS 27 SDK aborts at launch on iOS 27 ("UIScene life cycle is required for apps built with this SDK") unless it adopts the UIScene life cycle, which SDK 57's native template doesn't do and SDK 58's does. A build made with Xcode 26 runs fine on iOS 27. **When this app moves to Expo SDK 58, remove both `ios.image` pins and this section**, so builds go back to EAS's default image for the SDK. Local builds (`eas build --local`, `expo run:ios`) ignore the pin and use this Mac's Xcode 27; `plugins/withSceneDelegate.js` (listed in `app.json`, added fleet-wide 2026-10-15) makes them run on iOS 27 by wiring SDK 57's own `ExpoAppSceneDelegate` the way SDK 58's template does: `AppDelegate` conforms to `ExpoReactNativeFactoryProvider` and stops creating the window and overriding the Linking methods, `Info.plist` gets the scene manifest, and `SceneDelegate.swift` joins the app target. It edits `AppDelegate.swift` last (a finalized mod, whatever the `app.json` order), keeps any lines other plugins add after `startReactNative` (`@tastic/edge-guard`'s `_ = tastic_edgeGuardSwizzle`), throws on anything else unexpected rather than half-apply, and does nothing on SDK 58+. **On SDK 58, also delete the plugin and its `app.json` entry.** Solitaire's CLAUDE.md records how it was verified.
+Moved from SDK 57 (React Native 0.88), following BoxHockey and LightCycles. SDK 58's native template adopts the UIScene life cycle that apps linked against the iOS 27 SDK need, so the SDK 57 workarounds are gone: `plugins/withSceneDelegate.js` (and its `app.json` entry) and the `macos-tahoe-26.5-xcode-26.6` image pins in `eas.json`. Builds use EAS's default image for SDK 58 and, locally, this Mac's Xcode 27. The gitignored `ios/` and `android/` folders here are an older SDK 57 prebuild (React Native 0.86), so run `npx expo prebuild --clean` before a local build. Tests need `@react-native/jest-preset` installed (jest-expo 58's peer; the fleet's `legacy-peer-deps` means npm never adds it). React Native 0.88's strict TypeScript types are deferred fleet-wide through `@infinitetoken/tsconfig` 0.6; the web tab title from `expo-router/head` is set after hydration only; see TODO.md.
 
 ## @tastic/profile 0.14 and the scroll fade (2026-10-16)
 

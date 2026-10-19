@@ -31,7 +31,7 @@ function setSharedRoster(roster: Profile[]) {
 
 async function mount(local: Profile[]) {
   const store = configureStore({ reducer: { profiles: profilesReducer, profileSelection }, preloadedState: { profiles: local, profileSelection: { 1: 'alice', 2: 'bob' } } })
-  render(
+  await render(
     <Provider store={store}>
       <ProfilesProvider>{null}</ProfilesProvider>
     </Provider>
