@@ -25,6 +25,13 @@ const slice = createGuideSlice({ currentVersion: GUIDE_VERSION })
 // shipped useGameStats.tsx carried a comment claiming 'boxhockey.achievements' (a copy-paste leftover
 // in the comment only); the published 0.1.1 build writes 'airhockey.achievements', so that's the key
 // those devices actually have.
+//
+// The root store itself moved from persist:root to airhockey:root on 2026-10-19 (store.ts's keyPrefix:
+// a colon, so it can never be one of these dotted keys). persist:root is deliberately not listed: no
+// shipped build wrote it, and on the web it is the key every game on games.infinitetoken.com used to
+// share, so finding it says nothing about this player having played AirHockey. These dotted keys stay
+// safe on that shared origin: only the pre-redux native builds wrote them (AirHockey never had a web
+// deployment before the root store), and today's AirHockey and Pong write none of them.
 export const LEGACY_STORAGE_KEYS = [
   // Theme.tsx
   'airhockey.appearance',
