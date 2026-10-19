@@ -93,8 +93,14 @@ export default function GameScreen() {
   // app-wide (see OrientationBridge in _layout.tsx), the board included: while it's on, tilting the
   // phone never flips the goal axis, and toggling it from this screen's own Settings dialog takes
   // effect immediately rather than waiting for the next round.
+  //
+  // Except 2 Player on a phone, which always plays face-to-face (P1 at the bottom, P2 at the top)
+  // however the phone is held: the loadout's 2 Player panels are pinned to that same split, so each
+  // player keeps the same half of the phone from the loadout into the match. Turning the rink a
+  // quarter turn for a landscape hold used to give P1 a lengthwise half the loadout can't show.
   const { orientationMode, p1OnRight } = useOrientationState()
-  const goalAxis: GoalAxis = orientationMode === 'sideBySide' ? 'horizontal' : 'vertical'
+  const fixedSeats = Platform.OS !== 'web' && humanPlayers.length === 2
+  const goalAxis: GoalAxis = orientationMode === 'sideBySide' && !fixedSeats ? 'horizontal' : 'vertical'
 
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
