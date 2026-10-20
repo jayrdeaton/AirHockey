@@ -4,8 +4,7 @@ import { Button, IconButton, useVibration } from '@rific/feedback-press'
 import { useToast } from '@rific/toaster'
 import { broadcastDeviceUnlocks } from '@tastic/achievements'
 import { rotateInsets, useBackgroundPause, useOrientationState } from '@tastic/core'
-import { AchievementUnlockList, type AchievementUnlockOwner, ConfirmDialog, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
-import { Profile } from '@tastic/profile'
+import { ConfirmDialog, overlayActionStyles, OverlayBackdrop, OverlayCard, useOverlayCardColors, useQuitConfirmation } from '@tastic/hud'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Icon, Text } from 'react-native-paper'
@@ -14,9 +13,10 @@ import { useDispatch, useSelector } from 'react-redux'
 
 import Board from '@/components/BoardHost'
 import KeyboardInputLayer from '@/components/KeyboardInputLayer'
+import { SeatResultCards } from '@/components/SeatResultCards'
+import { SeatToasters } from '@/components/SeatToasters'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import TouchInputLayer from '@/components/TouchInputLayer'
-import { ACHIEVEMENT_TIER_COLORS } from '@/constants/achievements'
 import { MONO_FONT } from '@/constants/fonts'
 import { DESKTOP_WEB_MIN_WIDTH, FRICTION_LEVELS } from '@/constants/game'
 import { useAIOpponent } from '@/hooks/useAIOpponent'
@@ -25,13 +25,15 @@ import { useGameState } from '@/hooks/useGameState'
 import { useGameStats } from '@/hooks/useGameStats'
 import { useProfiles } from '@/hooks/useProfiles'
 import { useSettings } from '@/hooks/useSettings'
+import { SEAT_TOAST_STACKS, useUnlockToasts } from '@/hooks/useUnlockToasts'
 import { liveplayActions } from '@/redux/liveplaySlice'
 import { DEFAULT_SETTINGS } from '@/redux/settingsSlice'
 import type { AppDispatch, RootState } from '@/redux/store'
-import { AchievementDefinition, GoalAxis, Player } from '@/types'
+import { GoalAxis, Player } from '@/types'
 import { computeBoardLayout, computeLocalContainerSize } from '@/utils/board'
 import { humanPlayersFor } from '@/utils/gameMode'
 import { safeBack } from '@/utils/navigation'
+import { seatResultSpots } from '@/utils/seatResultSpots'
 
 // Converts a point expressed in the board's own LOCAL coordinate space (the same frame board.x/y
 // lives in) into a real, absolute screen position - mirrors Pong's own localToScreen exactly (see
@@ -57,7 +59,9 @@ function localToScreen(localX: number, localY: number, containerWidth: number, c
   return { x: screenCenterX + dx, y: screenCenterY + dy }
 }
 
+// Vs CPU has one human, seat 1.
 const SEATS: readonly Player[] = [1, 2]
+const SOLO_SEATS: readonly Player[] = [1]
 
 export default function GameScreen() {
   // Committed once by /loadout when every human player readied up - falls back to defaults for a
@@ -73,7 +77,8 @@ export default function GameScreen() {
   const dispatch = useDispatch<AppDispatch>()
   const { recordMatchOutcome } = useGameStats()
   const { profiles, lastSelected } = useProfiles()
-  const { clear: clearToasts, success: showAchievementToast } = useToast()
+  const { clear: clearToasts } = useToast()
+  const showUnlockToasts = useUnlockToasts()
   const roundSettings = activeRoundSettings ?? DEFAULT_SETTINGS
   const scoreToWin = roundSettings.scoreToWin
   const friction = FRICTION_LEVELS[roundSettings.friction]
@@ -171,11 +176,6 @@ export default function GameScreen() {
   useKeepAwake('game')
   const paused = settingsOpen || confirmVisible || backgroundPaused
 
-  // Two-player (pass-and-play) only - seat -> that seat's own newly-unlocked achievements this
-  // match, read by the two-player Game Over overlay below to badge each seat correctly (see the
-  // gameOver effect below for why this replaces showAchievementToast for that mode specifically).
-  const [seatUnlocks, setSeatUnlocks] = useState<Partial<Record<Player, AchievementDefinition[]>>>({})
-
   const { state, setPaddleTarget, resetGame } = useGameState(board, scoreToWin, friction, paused)
   const { phase, puck, paddles, scores, lastScoredGoal, bounceCount, goalDoorHitCount, lastGoalDoorSide } = state
 
@@ -202,22 +202,22 @@ export default function GameScreen() {
   useAIOpponent(state, board, aiPlayer, aiDifficulty, paused, setPaddleTarget)
 
   const isDesktopWeb = Platform.OS === 'web' && width >= DESKTOP_WEB_MIN_WIDTH
+  // 2 Player: each seat's half of the screen and the angle it reads at, for its Game Over card
+  // (SeatResultCards) and its unlock toasts (SeatToasters) alike, so a player's toasts sit where
+  // their card does, facing the same way.
+  const seatSpots = seatResultSpots(rotationDeg, isDesktopWeb)
 
   const { dark, colors: themeColors } = useAutoPaperTheme()
   const bg = dark ? '#000000' : '#FFFFFF'
   const fg = dark ? '#FFFFFF' : '#000000'
   // The Game Over card and the dialogs' score lines sit on @tastic/hud's OverlayCard, so their text
   // takes its theme colors rather than this screen's literal black/white.
-  const { fg: cardFg, fgMuted } = useOverlayCardColors()
+  const { fgMuted } = useOverlayCardColors()
 
   const playerColor: Record<Player, string> = { 1: themeColors.primary, 2: themeColors.secondary }
   const playerOnColor: Record<Player, string> = { 1: themeColors.onPrimary, 2: themeColors.onSecondary }
   const winner: Player = scores[0] >= scoreToWin ? 1 : 2
   const loser: Player = winner === 1 ? 2 : 1
-  // Whichever profile each seat had selected, if any - read the same way Pong's own game.tsx looks
-  // theirs up, so the two-player achievement badges below can identify whose unlock is whose.
-  const seatProfile: Partial<Record<Player, Profile>> = { 1: profiles.find((p) => p.id === lastSelected[1]) ?? undefined, 2: profiles.find((p) => p.id === lastSelected[2]) ?? undefined }
-  const achievementOwners: Record<Player, AchievementUnlockOwner> = { 1: { profile: seatProfile[1], color: playerColor[1] }, 2: { profile: seatProfile[2], color: playerColor[2] } }
 
   const vibration = useVibration()
   const vibrationRef = useRef(vibration)
@@ -263,30 +263,23 @@ export default function GameScreen() {
       const profileIds = { 1: lastSelected[1] ?? undefined, 2: aiPlayer === null ? (lastSelected[2] ?? undefined) : undefined }
       const result = recordMatchOutcome({ winner: matchWinner, scores: [scores[0], scores[1]], goalDoorHits: goalDoorHitCount }, { gameMode: roundSettings.gameMode, aiDifficulty, profileIds })
       if (aiPlayer === null) {
-        // Genuine two-seat pass-and-play - showAchievementToast below is a single, screen-fixed
-        // @rific/toaster call with no rotation of its own, so it only ever reads right-side-up for
-        // whichever seat happens to match the board's current rotationDeg. A player seated at the
-        // opposite end of the table (the far side of a portrait/vertical-goalAxis hold, same as
-        // real air hockey) would see it upside-down even though it's their own achievement.
-        // Broadcasting into seatUnlocks instead lets the two-player Game Over overlay below (which
-        // already carries the board's own rotationStyle) show each seat's own unlocks once the
-        // match settles - same fix Pong's/LightCycles' own game.tsx applies, for the identical
-        // reason. The winner's seat also gets the device-wide unlocks that are really its own (all
-        // of them for a guest, only scope: 'device' ones for a profile; see @tastic/achievements'
-        // broadcastDeviceUnlocks). The loser's card shows only its own (audit F037).
-        const broadcast = broadcastDeviceUnlocks([1, 2] as Player[], result.profiles, result.device, profileIds, { winners: [matchWinner] })
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- a real one-shot transition guarded by prevPhaseRef above, not a render loop; the sibling vsCpu branch below fires showAchievementToast (which does the same thing inside @rific/toaster) unconditionally in this same effect
-        setSeatUnlocks(broadcast)
+        // Genuine two-seat pass-and-play: each seat's unlocks are toasts on that seat's own stack,
+        // in their half of the screen and turned to face them (SeatToasters, on seatSpots), so a
+        // player at the opposite end of the table (the far side of a portrait/vertical-goalAxis
+        // hold, same as real air hockey) reads their own the right way up, and players side by side
+        // each read theirs on their own side. The winner's seat also gets the device-wide unlocks
+        // that are really its own (all of them for a guest, only scope: 'device' ones for a profile;
+        // see @tastic/achievements' broadcastDeviceUnlocks). The loser gets only its own (audit F037).
+        const broadcast = broadcastDeviceUnlocks(SEATS, result.profiles, result.device, profileIds, { winners: [matchWinner] })
+        showUnlockToasts(broadcast, SEATS, { 1: profiles.find((p) => p.id === profileIds[1])?.name, 2: profiles.find((p) => p.id === profileIds[2])?.name }, SEAT_TOAST_STACKS)
       } else {
         // vsCpu only ever has one human perspective (seat 1) to address - the shared, screen-fixed
         // toast is fine here.
-        ;(broadcastDeviceUnlocks([1] as Player[], result.profiles, result.device, profileIds)[1] ?? []).forEach((achievement) => {
-          showAchievementToast(achievement.title, 'Achievement unlocked', undefined, { color: ACHIEVEMENT_TIER_COLORS[achievement.tier], icon: achievement.icon })
-        })
+        showUnlockToasts(broadcastDeviceUnlocks(SOLO_SEATS, result.profiles, result.device, profileIds), SOLO_SEATS, { 1: profiles.find((p) => p.id === profileIds[1])?.name })
       }
     }
     prevPhaseRef.current = phase
-  }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, goalDoorHitCount, lastSelected, roundSettings.gameMode, recordMatchOutcome, showAchievementToast])
+  }, [phase, scores, scoreToWin, aiPlayer, aiDifficulty, goalDoorHitCount, lastSelected, roundSettings.gameMode, recordMatchOutcome, profiles, showUnlockToasts])
 
   // ─── Floating UI placement ─────────────────────────────────────────────────
   // Back/settings chips and the Game Over/quit-confirm cards all live OUTSIDE the board's own
@@ -365,10 +358,17 @@ export default function GameScreen() {
 
       {/* Game Over overlay - card rotates as a unit via rotationDeg so it reads upright whichever
           way the board itself is currently rotated (see rotationStyle above), matching Pong's own
-          Game Over card; previously left unrotated. Upright on desktop web (see overlayRotationDeg). */}
-      {phase === 'gameOver' && (
-        <OverlayBackdrop>
-          <OverlayCard style={overlayRotationStyle}>
+          Game Over card; previously left unrotated. Upright on desktop web (see overlayRotationDeg).
+          2 Player gets one card per seat instead, each in that player's half and turned to face
+          them (SeatResultCards); this single card is Vs CPU's. */}
+      {phase === 'gameOver' && aiPlayer === null && <SeatResultCards winner={winner} scores={scores} playerColor={playerColor} playerOnColor={playerOnColor} spots={seatSpots} onPlayAgain={() => resetGame(board)} onQuit={safeBack} />}
+
+      {/* 2 Player's unlock toasts, a Toaster per seat in that seat's half, turned to face it (see
+      the gameOver effect above); every other toast stays on the app's main Toaster (_layout.tsx). */}
+      {aiPlayer === null && <SeatToasters spots={seatSpots} />}
+      {phase === 'gameOver' && aiPlayer !== null && (
+        <OverlayBackdrop style={styles.resultBackdrop}>
+          <OverlayCard style={[styles.resultCard, overlayRotationStyle]}>
             <Icon source='trophy' size={64} color={playerColor[winner]} />
             <Text variant='headlineLarge' style={[styles.overlayTitle, { color: playerColor[winner], fontFamily: MONO_FONT }]}>
               Wins!
@@ -378,17 +378,15 @@ export default function GameScreen() {
               <Text style={{ color: fgMuted }}> - </Text>
               <Text style={{ color: playerColor[2] }}>{scores[1]}</Text>
             </Text>
-            {/* Two-player-only achievement rows - see seatUnlocks' own doc above for why these land
-            here instead of the shared showAchievementToast vsCpu still uses. This card already
-            carries a single shared rotationStyle, so each row's owner avatar is what identifies
-            whose achievement it is, not a second independent rotation. */}
-            {aiPlayer === null && <AchievementUnlockList unlocks={seatUnlocks} seats={SEATS} owners={achievementOwners} tierColors={ACHIEVEMENT_TIER_COLORS} fg={cardFg} />}
-            <Button mode='contained' onPress={() => resetGame(board)} style={styles.overlayButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
-              Play Again
-            </Button>
-            <Button mode='contained' onPress={safeBack} style={styles.overlayButton} buttonColor={playerColor[winner]} textColor={playerOnColor[winner]}>
-              Quit
-            </Button>
+            {/* hud's action row, as in ConfirmDialog: Quit (outlined) on the left, Play Again (filled) on the right, side by side (Jay, 2026-10-20). */}
+            <View style={overlayActionStyles.actions}>
+              <Button mode='outlined' onPress={safeBack} style={overlayActionStyles.actionButton}>
+                Quit
+              </Button>
+              <Button mode='contained' onPress={() => resetGame(board)} style={overlayActionStyles.actionButton} buttonColor={playerColor[loser]} textColor={playerOnColor[loser]}>
+                Play Again
+              </Button>
+            </View>
           </OverlayCard>
         </OverlayBackdrop>
       )}
@@ -442,9 +440,12 @@ const styles = StyleSheet.create({
   // (0,0) instead, which is what silently put the whole board off-center before this was caught
   // in the browser preview).
   localContainer: {},
-  overlayButton: { width: 160 },
   overlayScore: {},
   overlayTitle: { fontWeight: 'bold' },
+  // The single Game Over card, as ConfirmDialog's: room from the screen's edges, and the card's full
+  // width allowance (OverlayCard's maxWidth, 360) so its action row has room to sit side by side.
+  resultBackdrop: { paddingHorizontal: 24 },
+  resultCard: { width: '100%' },
   root: { flex: 1 },
   settingsButton: { position: 'absolute' },
   viewport: { alignItems: 'center', justifyContent: 'center', left: 0, position: 'absolute', top: 0 }
