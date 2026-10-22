@@ -60,13 +60,13 @@ export default function AchievementsScreen() {
   // useWellColors: onSurface, onSurfaceVariant), the same ones hud's StatRow and AchievementRow default to.
   const { fg, fgMuted } = useWellColors()
 
-  // null = "All Profiles" (device-wide). Self-heals to null if the selected profile is deleted from
+  // null = "Everyone" (device-wide). Self-heals to null if the selected profile is deleted from
   // another still-mounted screen - effectiveProfileId simply stops matching any entry in `profiles`.
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null)
   const effectiveProfileId = selectedProfileId && profiles.some((p) => p.id === selectedProfileId) ? selectedProfileId : null
   const profileBucket = effectiveProfileId ? (stats.profiles[effectiveProfileId] ?? DEFAULT_PROFILE_STATS) : null
   // The same StatsState-shaped object every predicate and helper already reads - statsView === stats
-  // for "All Profiles", so every section collapses to the device-wide view in that case.
+  // for "Everyone", so every section collapses to the device-wide view in that case.
   const statsView = profileBucket ? getProfileStatsView(profileBucket) : stats
 
   const overall = useMemo(() => getOverallTotals(statsView), [statsView])
@@ -76,7 +76,7 @@ export default function AchievementsScreen() {
   return (
     <FakeLandscapeView style={styles.rotatable}>
       <BaseStatsScreen onBack={safeBack} insets={insets} onReset={resetAll} rotation={rotation}>
-        {profiles.length > 0 && <ProfilePicker idPrefix='achievements' host={profilePickerHost} profiles={profiles} selectedId={effectiveProfileId} color={themeColors.primary} dark={dark} guestLabel='All Profiles' nullLabel='All Profiles' nullIcon='account-group' onSelect={(profile) => setSelectedProfileId(profile?.id ?? null)} />}
+        {profiles.length > 0 && <ProfilePicker idPrefix='achievements' host={profilePickerHost} profiles={profiles} selectedId={effectiveProfileId} color={themeColors.primary} dark={dark} guestLabel='Everyone' nullLabel='Everyone' nullIcon='account-group' onSelect={(profile) => setSelectedProfileId(profile?.id ?? null)} />}
 
         <StatSection label='OVERALL'>
           <StatRow label='Played' value={String(overall.played)} />
@@ -99,7 +99,7 @@ export default function AchievementsScreen() {
           <StatRow label='Best Streak' value={String(statsView.vsCpu.bestWinStreak)} />
         </StatSection>
 
-        {/* All Profiles keeps the seat framing (whoever sat where); a selected profile switches to
+        {/* Everyone keeps the seat framing (whoever sat where); a selected profile switches to
       that profile's own record, where p1Wins+p2Wins is always THIS profile's own win count. */}
         <StatSection label='TWO PLAYER (LOCAL)'>
           {profileBucket ? (
@@ -118,7 +118,7 @@ export default function AchievementsScreen() {
         </StatSection>
 
         {/* A leaderboard across profiles is inherently a cross-profile question, so it only appears
-      on "All Profiles" - once you've drilled into one profile it answers a different question. */}
+      on "Everyone" - once you've drilled into one profile it answers a different question. */}
         {effectiveProfileId === null && rankings.length > 0 && (
           <StatSection label='PLAYER RANKINGS'>
             {rankings.map((ranking) => (
